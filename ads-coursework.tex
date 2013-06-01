@@ -103,7 +103,7 @@ to be in a normal form.
 \end{comment}
 \begin{figure}[h]
   \begin{center}
-    \includegraphics[width=\linewidth]{plant_single_relation.png}
+    \includegraphics[width=1in]{plant_single_relation.png}
   \end{center}
   \caption{Representing the dataset as a single relation}
   \label{fig:single-relation}
@@ -140,9 +140,13 @@ Figure~\ref{fig:cat-tags-rel}.
     service
     brand_pid
     is_clip
-    categories
-    tags
   }
+  class Category
+  }
+  class Tag {
+  }
+  Programme "0..*" - "0..*" Category
+  Programme "0..*" - "0..*" Tag
   @enduml
 \end{comment}
 \begin{figure}[h]
