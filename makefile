@@ -13,6 +13,7 @@ SRC	:= $(shell egrep -l '^[^%]*\\begin\{document\}' *.tex)
 PDF	= $(SRC:%.tex=%.pdf)
 
 define run-latex
+	plantuml $<
 	$(COPY);$(LATEX) $<
 	egrep $(MAKEIDX) $< && ($(MAKEINDEX) $(<:%.tex=%);$(COPY);$(LATEX) $<) >/dev/null; true
 	egrep -c $(RERUNBIB) $(<:%.tex=%.log) && ($(BIBTEX) $(<:%.tex=%);$(COPY);$(LATEX) $<) ; true

@@ -1,5 +1,8 @@
 \documentclass[11pt,a4paper]{article}
 
+\usepackage{verbatim}
+\usepackage{graphicx}
+
 \title{Advanced Database Systems Coursework}
 \author{Ross Fenning}
 
@@ -41,7 +44,7 @@ a single programme. Each programme row comprises:
     \item the master brand with which the programme is associated (somewhat
       correlated with the channel that broadcasted the programme, e.g.
       BBC Radio Four or BBC Two);
-    \item the service that did broadcase the programme originally;
+    \item the service that did broadcast the programme originally;
     \item a pid identifier for the programme's brand (e.g. for an episode of
       Doctor Who this would be the identifier for the Doctor Who concept
       in general);
@@ -51,8 +54,105 @@ a single programme. Each programme row comprises:
     \item any tags set against the programme.
 \end{itemize}
 
+We might imagine that this will form the basis of a whole archive of BBC
+TV and radio programmes with a variety of use cases for such an archive.
+Potential uses for such a database will be discussed as different designs
+and approaches are used to import this information into three different
+database systems.
+
 \section{Object-Relational}
+
+The Object-Relational database system used here is PostgreSQL, which supports
+pure relational databases and SQL, but also has support for objects and
+inheritance to support an aggregate-oriented approach, where we can store
+aggregates of data together as single objects for atomic updates against
+them or simply to group information together into logical objects. This
+takes us somewhat away from the pure relational model where data aggregation
+is distributed across relations between many tuples. \cite{sadalage2012nosql}
+
 \subsection{Design}
+
+The first benefit of the relational model (which is treated here as a strict
+subset of the object-relational model) is that our comma-separated source
+data can be na\"ively imported as a single relation, with one row of the CSV
+file being stored as exactly one row in the relation. This is shown in
+Figure~\ref{fig:single-relation}. This seems
+to be the path of least resistance if we simply want to stage the data
+in a database system quickly so as to begin queries against it, but is
+likely losing some of the benefits of the relational model and is unlikely
+to be in a normal form.
+
+\begin{comment}
+  @startuml plant_single_relation.png
+  class Programme {
+    pid
+    start_time
+    end_time
+    epoch_start
+    epoch_end
+    complete_title
+    media_type
+    masterbrand
+    service
+    brand_pid
+    is_clip
+    categories
+    tags
+  }
+  @enduml
+\end{comment}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[width=\linewidth]{plant_single_relation.png}
+  \end{center}
+  \caption{Representing the dataset as a single relation}
+  \label{fig:single-relation}
+\end{figure}
+
+The other problem with importing a whole row into a single relation is that
+a pure relational database system is probably not going to be able to deal
+with the categories and tags columns, which are both lists. Without support
+for lists or arrays, the only compromise we would have is to import them
+as raw string types and leave it to the application code to parse and break
+apart those strings to derive further meaning from them. The consequence of
+this is that there is no elegant way to query based on the contents of
+the categories or tags fields, which is unhelpful if the intention is to
+serve an application that wishes to allow searching by tag or category.
+
+The presence of multiple values in the categories and tags fields already
+means our single relation model is not in First Normal Form (1NF).
+\cite{codd1972further}
+An obvious next step is to create relations for categories and for tags,
+with relations. This would produce something similar to
+Figure~\ref{fig:cat-tags-rel}.
+
+\begin{comment}
+  @startuml plant_single_relation.png
+  class Programme {
+    pid
+    start_time
+    end_time
+    epoch_start
+    epoch_end
+    complete_title
+    media_type
+    masterbrand
+    service
+    brand_pid
+    is_clip
+    categories
+    tags
+  }
+  @enduml
+\end{comment}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[width=\linewidth]{plant_single_relation.png}
+  \end{center}
+  \caption{Relations created for the list/set types}
+  \label{fig:cat-tags-rel}
+\end{figure}
+
 \subsection{Implementation}
 \subsection{Querying}
 
