@@ -25,6 +25,32 @@ cases to which each kind of database are most appropriate.
 
 \section{The Data}
 
+The dataset that will be used is a small set of 7,788 TV and radio programmes
+that have been available to listen to or watch on some form of catch-up
+service (e.g. the old radio ``Listen Again'' service or BBC iPlayer) between
+2001 and 2012.
+
+The raw data begin in a comma-separated format, with each row representing
+a single programme. Each programme row comprises:
+
+\begin{itemize}
+    \item an identifier known as a \emph{pid} (programme ID);
+    \item a start and end time (in both Unix timestamp and ISO 8601 formats);
+    \item a title;
+    \item a media type (i.e. audio or video);
+    \item the master brand with which the programme is associated (somewhat
+      correlated with the channel that broadcasted the programme, e.g.
+      BBC Radio Four or BBC Two);
+    \item the service that did broadcase the programme originally;
+    \item a pid identifier for the programme's brand (e.g. for an episode of
+      Doctor Who this would be the identifier for the Doctor Who concept
+      in general);
+    \item whether or not this is a programme or a just a clip that was
+      available to watch/listen to;
+    \item any categories associated with the programme; and
+    \item any tags set against the programme.
+\end{itemize}
+
 \section{Object-Relational}
 \subsection{Design}
 \subsection{Implementation}
