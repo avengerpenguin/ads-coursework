@@ -82,6 +82,10 @@ in a database system quickly so as to begin queries against it, but is
 likely losing some of the benefits of the relational model and is unlikely
 to be in a normal form.
 
+We can proceed initially to normalise the table as far as possible in
+a pure relational model and then look to see what benefits can be gained
+from introducing objects as in the object-relational model.
+
 \begin{comment}
   @startuml plant_single_relation.png
   class Programme {
@@ -159,6 +163,61 @@ Figure~\ref{fig:cat-tags-rel}.
   \end{center}
   \caption{Relations created for the list/set types}
   \label{fig:cat-tags-rel}
+\end{figure}
+
+The schema so far is still not in Second Normal Form (2NF),
+however. Whilst it may not be the case in the exact data set
+at hand, there is a distinct possibility we will want our database
+to store a programme that has been repeated and thus becomes eligible
+for watching on a catch-up service within a second window of time.
+In this case the best candidate key for the table would be a tuple
+including the pid and at least the start time (if not the end time
+as well) of the catch-up availability window.
+
+With a composite key of the pid and the time, we can clearly see
+that non-prime attributes such as the programme's master brand, tags
+or media type are dependent on just the programme identifier subset
+of the key, not the time slots. Thus if we wish to take our schema
+design into 2NF, we need to break apart the programme information
+and the time windows into their own relations as shown in
+Figure~\ref{fig:2nf}.
+
+\begin{comment}
+  @startuml plant_2nf.png
+  class Programme {
+    pid
+    complete_title
+    media_type
+    masterbrand
+    brand_pid
+    is_clip
+  }
+  class AvailabilityWindow {
+    start_time
+    end_time
+    epoch_start
+    epoch_end
+    service
+  }
+  class Category {
+    id
+    level
+    title
+  }
+  class Tag {
+    title
+  }
+  Programme "1" -d- "0..*" AvailabilityWindow
+  Programme "0..*" -r- "0..*" Category
+  Programme "0..*" -l- "0..*" Tag
+  @enduml
+\end{comment}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[width=\linewidth]{plant_2nf.png}
+  \end{center}
+  \caption{Programme and availability windows separated for 2NF}
+  \label{fig:2nf}
 \end{figure}
 
 \subsection{Implementation}
