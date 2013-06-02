@@ -17,7 +17,7 @@ three different kinds of databases beyond the traditional relational model. In i
 the same dataset will be modelled in each of an \emph{Object-Relational} database,
 an \emph{XML} database and a \emph{Document} database.
 
-An optimal structure or schema will be designed for each database type, then
+A suggested structure or schema will be designed for each database type, then
 each design will be implemented in each of \emph{PostgreSQL}, \emph{eXist}
 and \emph{MongoDB} along with a discussion around how each database would be
 queried for different use cases.
@@ -120,14 +120,14 @@ the categories or tags fields, which is unhelpful if the intention is to
 serve an application that wishes to allow searching by tag or category.
 
 The presence of multiple values in the categories and tags fields already
-means our single relation model is not in First Normal Form (1NF).
+means our single relation model is not even in First Normal Form (1NF).
 \cite{codd1972further}
 An obvious next step is to create relations for categories and for tags,
 with relations. This would produce something similar to
 Figure~\ref{fig:cat-tags-rel}.
 
 \begin{comment}
-  @startuml plant_single_relation.png
+  @startuml plant_three_relations.png
   class Programme {
     pid
     start_time
@@ -141,17 +141,21 @@ Figure~\ref{fig:cat-tags-rel}.
     brand_pid
     is_clip
   }
-  class Category
+  class Category {
+    id
+    level
+    title
   }
   class Tag {
+    title
   }
-  Programme "0..*" - "0..*" Category
-  Programme "0..*" - "0..*" Tag
+  Programme "0..*" -r- "0..*" Category
+  Programme "0..*" -l- "0..*" Tag
   @enduml
 \end{comment}
 \begin{figure}[h]
   \begin{center}
-    \includegraphics[width=\linewidth]{plant_single_relation.png}
+    \includegraphics[width=\linewidth]{plant_three_relations.png}
   \end{center}
   \caption{Relations created for the list/set types}
   \label{fig:cat-tags-rel}
@@ -172,4 +176,6 @@ Figure~\ref{fig:cat-tags-rel}.
 
 \section{Comparison}
 
+\bibliographystyle{cell}
+\bibliography{bibtex}
 \end{document}
