@@ -107,7 +107,7 @@ from introducing objects as in the object-relational model.
   }
   @enduml
 \end{comment}
-\begin{figure}[h]
+\begin{figure}[p]
   \begin{center}
     \includegraphics[width=1in]{plant_single_relation.png}
   \end{center}
@@ -159,7 +159,7 @@ Figure~\ref{fig:cat-tags-rel}.
   Programme "0..*" -l- "0..*" Tag
   @enduml
 \end{comment}
-\begin{figure}[h]
+\begin{figure}[p]
   \begin{center}
     \includegraphics[width=\linewidth]{plant_three_relations.png}
   \end{center}
@@ -214,7 +214,7 @@ Figure~\ref{fig:2nf}.
   Programme "0..*" -l- "0..*" Tag
   @enduml
 \end{comment}
-\begin{figure}[h]
+\begin{figure}[p]
   \begin{center}
     \includegraphics[width=\linewidth]{plant_2nf.png}
   \end{center}
@@ -261,7 +261,7 @@ as shown in Figure~\ref{fig:3nf}
   Programme "0..*" -l- "0..*" Tag
   @enduml
 \end{comment}
-\begin{figure}[h]
+\begin{figure}[p]
   \begin{center}
     \includegraphics[width=\linewidth]{plant_3nf.png}
   \end{center}
@@ -389,6 +389,47 @@ children thereof. It is possible to model this using table
 a Subcategory table that inherits the identifier and title attributes
 from the Category table, but additionally adds a reference to any
 other (sub)category indicating its parent.
+
+Taking the approach of making tags string arrays within the programme
+aggregate (for simplicity, performance and atomic updates) and using
+inheritence to maintain a category hierarchy, we arrive at a final
+candidate entity relationship design as shown in figure~\ref{fig:final_postgres}.
+
+\begin{comment}
+  @startuml plant_final_postgres.png
+  class Programme {
+    pid : varchar
+    complete_title : varchar
+    media_type : enum ['video, 'audio']
+    masterbrand : varchar
+    brand_pid : varchar
+    is_clip : boolean
+    tags : varchar[]
+  }
+  class AvailabilityWindow {
+    start_time : timestamp
+    end_time : timestamp
+    service : varchar
+  }
+  class Category {
+    id : varchar
+    title : varchar
+  }
+  class Subcategory extends Category {
+    parent : Category
+  }
+  Programme "1" -d- "0..*" AvailabilityWindow
+  Programme "0..*" -r- "0..*" Category
+  @enduml
+\end{comment}
+\begin{figure}[p]
+  \begin{center}
+    \includegraphics[width=\linewidth]{plant_final_postgres.png}
+  \end{center}
+  \caption{Candidate final design for PostgresSQL database}
+  \label{fig:final_postgres}
+\end{figure}
+
 
 \subsection{Implementation}
 \subsection{Querying}
