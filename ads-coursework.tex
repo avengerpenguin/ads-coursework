@@ -86,6 +86,8 @@ We can proceed initially to normalise the table as far as possible in
 a pure relational model and then look to see what benefits can be gained
 from introducing objects as in the object-relational model.
 
+\subsubsection{Pure Relational Model}
+
 \begin{comment}
   @startuml plant_single_relation.png
   class Programme {
@@ -232,7 +234,7 @@ here. This then leaves us with our final relational model in 3NF
 as shown in Figure~\ref{fig:3nf}
 
 \begin{comment}
-  @startuml plant_2nf.png
+  @startuml plant_3nf.png
   class Programme {
     pid : varchar
     complete_title : varchar
@@ -299,9 +301,94 @@ as shown in figure~\ref{fig:3nf}, we would create the following relations:
 So, what benefits can we can from the non-SQL or object-like features of
 PostgreSQL over and above the pure relational mode?
 
+\subsubsection{Aggregate model and array fields}
+
 If we wanted to search for a set of programmes along with their tags, we would
 have to do a JOIN query each time. With very large Programme and Tag tables, this
 JOIN could get very expensive -- especially with complex filtering involved.
+
+In a more aggregate-oriented approach, we could treat the tags as an
+intrinsic part of a programme \emph{aggregate} -- we would only want to update
+the tags within the context of updating a programme and we're hardly
+ever likely to query a Tag relation independently of the Programme relation.
+With this, we could employ an array type within PostgreSQL with either the
+arrays pointing to a table of all potential Tag values
+(using \emph{ELEMENT REFERENCES})
+or the arrays containing string values of the tags themselves. With string
+arrays, we lose the consistency of being able to update a tag itself (say,
+for spelling corrections), but we have a far faster way of changing the tags
+of a programme whilst updating the programme aggregate as a whole.
+
+Note that updating the aggregate atomically in this way removes the need
+to use transactions, which would be necessary if we were both updating the
+Tag and Programme relations in a single update. Again, we could see some
+real performance gains if this database were receiving a lot of updates and
+would otherwise be subject to a lot of locking and contention. \cite{sadalage2012nosql}
+
+The consistency then arguably becomes easier to maintain were we to scale
+to a distributed database model. If a programme is modelled as an aggregate
+containing its own tags, then an atomic update of a programme and its tags
+can be replicated across nodes eventually without worry that the update
+to the programme may synchronise before the update containg the new tag it's
+supposed to have gained. In the pure relational model, we would have used
+transactions to keep the two updates together; with the aggregate model,
+that need is removed.
+
+The key to a lot of this debate around the tags for a programme really lies
+in how the business intends for that information to be used. Generally,
+the concept of tagging is a loose way to add textual metadata to a
+business object to aid searches, automatic aggregation and even data
+mining potential (e.g. this user likes things with this particular tag,
+so we can suggest them more content with similar tags).
+
+Tagging is something that can even somewhat benefit from being unconstrained
+and freely chosen as the item is added or updated. \cite{smith2008tagging}
+It is also arguable that the harm in a tag being spelled incorrectly
+on one programme is a minor harm (given it is additional metadata that
+does not harm normal navigation nor basic application functions) when
+compared to the benefit given to editors and content producers that
+they can add as many tags freely as they please to their content items.
+
+\subsubsection{Modelling programme categories}
+
+Can we apply the same reasoning to the categories? Similarly to the
+tags, we could consider adding them as an array type within the
+Programme relation. Given they are more complex entities, we could
+not easily store them as primitive strings, but the possibility of an
+array of foreign key references to the Category relation is there. Another
+option is that of an array of a custom \emph{composite} type.
+
+With a composite type, we could create a category type and use that within
+an array in our Programme relation. However, categories are likely to be
+used very differently to tags in that they are commonly used to
+drive hierarchical navigation in a user interface, allowing users
+to browse categories of interest for the latest or most popular items
+therewithin.
+
+Given that we might (almost) equally query for programmes or categories,
+we probably still want to keep their respective relations and rely on
+JOIN queries to link the two when needed. It is not unreasonable to
+expect an application where the categories themselves are rarely changed,
+but programmes are individually added in frequent updates against these
+relatively static categories. Thus we would have rare need for rapid,
+expensive transactions where both tables need updating atomically. In
+the rare cases where a category is added along with a programme,
+we could easily pay the performance cost on such a one-off update.
+
+The option of a composite type should be kept for consideration (perhaps
+if further requirements gathering indicates it is a better approach),
+but with the assumptions made so far, there seems to be little
+case for it.
+
+Another question is whether to model the hierarchical nature of the
+category entity. The level attribute of a category (so far only values
+\emph{1} and \emph{2} are observed) hints at a category hierarchy with
+level 1 categories being root categories and level 2 categories being
+children thereof. It is possible to model this using table
+\emph{inheritence} within PostgreSQL. In this case, we could define
+a Subcategory table that inherits the identifier and title attributes
+from the Category table, but additionally adds a reference to any
+other (sub)category indicating its parent.
 
 \subsection{Implementation}
 \subsection{Querying}
