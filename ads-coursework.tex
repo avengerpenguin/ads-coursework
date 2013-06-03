@@ -220,6 +220,89 @@ Figure~\ref{fig:2nf}.
   \label{fig:2nf}
 \end{figure}
 
+So, the remaining problem that is keeping the design from being in
+Third Normal Form (3NF) is there is a functional dependency
+between the start and end timestamps and the same times expressed
+in ISO 8601 format. Rather than this being a case for refactoring
+out to another relation however, we can simply opt to store
+our start and end times in a single format and leave it up to queries
+to choose to convert to the desired format later on. In fact, the
+\emph{timestamp} data type with PostgreSQL is perfectly suitable
+here. This then leaves us with our final relational model in 3NF
+as shown in Figure~\ref{fig:3nf}
+
+\begin{comment}
+  @startuml plant_2nf.png
+  class Programme {
+    pid : varchar
+    complete_title : varchar
+    media_type : enum ('video, 'audio')
+    masterbrand : varchar
+    brand_pid : varchar
+    is_clip : boolean
+  }
+  class AvailabilityWindow {
+    start_time : timestamp
+    end_time : timestamp
+    service : varchar
+  }
+  class Category {
+    id : varchar
+    level : smallint
+    title : varchar
+  }
+  class Tag {
+    title : varchar
+  }
+  Programme "1" -d- "0..*" AvailabilityWindow
+  Programme "0..*" -r- "0..*" Category
+  Programme "0..*" -l- "0..*" Tag
+  @enduml
+\end{comment}
+\begin{figure}[h]
+  \begin{center}
+    \includegraphics[width=\linewidth]{plant_3nf.png}
+  \end{center}
+  \caption{Removed date redundancy allows the model to be in 3NF}
+  \label{fig:3nf}
+\end{figure}
+
+We might find that we can achieve stricter normal forms with
+media type being dependent on the service or the master brand
+(i.e. radio services will only broadcast audio and TV services
+will always broadcast video), but for this design we will stop short
+of looking to go into Forth Normal Form (4NF) or stricter.
+\cite{fagin1977multivalued}
+In a real business application, it's hard to make that assumption
+without confirmation of the requirements (maybe a TV service will
+broadcast an audio-only programme one day). It is also something to keep in
+mind given that tables found to be violating 4NF can be very common
+in business applications. \cite{wu1992practical} In our case, it is
+entirely possible for a client application to insert a programme on
+BBC Radio Four with the media type \emph{video}. Before building
+this database for a real application, we would likely clarify whether
+that is an acceptable state or whether such a row would be considered
+inconsistent.
+
+When we come to implement the entities and their respective relations
+as shown in figure~\ref{fig:3nf}, we would create the following relations:
+
+\begin{enumerate}
+  \item Programme(pid, complete\_title, media\_type, masterbrand, brand\_pid, is\_clip)
+  \item AvailabilityWindow(pid, start\_time, end\_time, service)
+  \item Category(id, level, title)
+  \item ProgrammeCategory(pid, category\_id)
+  \item Tag(title)
+  \item ProgrammeTag(pid, title)
+\end{enumerate}
+
+So, what benefits can we can from the non-SQL or object-like features of
+PostgreSQL over and above the pure relational mode?
+
+If we wanted to search for a set of programmes along with their tags, we would
+have to do a JOIN query each time. With very large Programme and Tag tables, this
+JOIN could get very expensive -- especially with complex filtering involved.
+
 \subsection{Implementation}
 \subsection{Querying}
 
