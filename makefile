@@ -30,9 +30,18 @@ clean:
 
 all: $(PDF)
 
-pdf: $(PDF)
+pdf: postgres.sql $(PDF)
 
 .PHONY	: all clean pdf
 
 $(PDF) : %.pdf : %.tex
 	@$(run-latex)
+
+pep8:
+	pep8 postgres.py
+
+postgres.sql: pep8
+	python postgres.py | tee postgres.sql
+
+postgres: postgres.sql
+	sudo -u postgres psql <postgres.sql
