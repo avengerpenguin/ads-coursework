@@ -2,6 +2,12 @@
 
 \usepackage{verbatim}
 \usepackage{graphicx}
+\usepackage{listings}
+\lstset{
+  breakatwhitespace=true,
+  breaklines=true,
+  frame=single
+}
 
 \title{Advanced Database Systems Coursework}
 \author{Ross Fenning}
@@ -431,17 +437,357 @@ candidate entity relationship design as shown in figure~\ref{fig:final_postgres}
 \end{figure}
 
 \subsection{Implementation}
+
+With a design finalised, we can build a PostgreSQL database from
+our data. A potential script that will create tables in the PostgreSQL
+dialect of SQL is shown in figure~\ref{fig:create_table}.
+
+\begin{figure}[p]
+  \lstinputlisting[frame=single,language=SQL]{postgres_broken.sql}
+  \caption{SQL script to create PostgreSQL tables for programme data}
+  \label{fig:create_table}
+\end{figure}
+
+However, there is a problem with this schema. When we try to import the
+data into these relations, PostgreSQL responds with an error:
+
+\begin{verbatim}
+ERROR:  insert or update on table "programme_category" violates\
+ foreign key constraint "programme_category_category_id_fkey"
+DETAIL:  Key (category_id)=(9200041) is not present in table \
+"category".
+\end{verbatim}
+
+It seems that we are attempting to insert a link between a programme and
+a category that doesn't exist. The ID 9200041 refers to a subcategory called
+\emph{arts\_culture\_and\_the\_media}, underneath the \emph{factual} top-level
+category. The problem we have encountered here is a limitation with the
+inheritance model in PostgreSQL in that our foreign key from the
+programme\_category relation to the category relation can only refer to things
+that are strictly categories and not the subcategories. The child relation
+of subcategory cannot inherit being a suitable reference from another table.
+A similar limitation is seen again in that we have to define an explicit
+primary key in the subcategory table as that is something else which
+cannot inherit from a parent table.
+
+The PostgreSQL documentation \cite{postgres-docs} confirms this to be the
+case and moreover states ``There is no good workaround for this case.'' So,
+we have to look at restructuring our schema a little as it appears that
+the inheritance model in PostgreSQL is not as complete or pure as would
+be expected from Object-Oriented Programming (OOP). In OOP, one important
+principle is the Liskov Substitution Principle (LSP) that states -- at
+a basic level -- that if some type $S$ is a subtype of a type $T$, then
+any object or instance of $T$ may be swapped out for an object of
+type $S$ without altering the behaviour of a programme or system.
+
+PostgreSQL's inheritance model violates the Liskov Substituion Principle
+in that our relation that refers to a category cannot have its foreign key
+constrained field make a reference to the subcategory relation. In other
+words, we are unable to use a subcategory logically everywhere we could
+have used a category.
+
+\begin{figure}[p]
+  \lstinputlisting[frame=single,language=SQL,firstline=10,lastline=46]{postgres.sql}
+  \caption{PostgreSQL script without using inheritance}
+  \label{fig:flatten-category}
+\end{figure}
+
+There are a number of ways we could restructure our schema design to
+avoid this limitation and a simple one is to eschew the inheritance feature
+altogether and return to the ``old way'' -- a single category relation
+with a nullable parent field (where a null parent indicates a top-level
+category). This alteration is shown in figure~\ref{fig:flatten-category}.
+This is a step back away from the object-relational model to the pure
+relational model, but it seems the inheritance feature just was not
+suitable for our needs in this case, but it may prove useful in other
+situations.
+
 \subsection{Querying}
+
+With a schema design that now works and the CSV of programmes information
+converted and imported into that schema, we can look at how we get
+the information back out. Without formal requirements, we can only
+suppose some of the use cases, but we can assume some relatively typical
+needs. We can express these as questions as asked by an end user and then
+look into the queries they would then translate into for the database.
+
+We will also look at use cases where content editors may wish to update
+or alter the information.
+
+\subsubsection{What can I watch right now?}
+
+This is a basic query where we seek everything where the start\_time is
+in the past, but the end\_time is in the future:
+
+\begin{lstlisting}[language=SQL]
+  SELECT * FROM availability_window
+    JOIN programme ON availability_window.pid = programme.pid
+  WHERE start_time <= now() AND end_time >= now();
+\end{lstlisting}
+
+We should be able to trust the query optimisation to know to
+narrow the availability\_window down to the relatively small set
+of things available only now before doing the join to the larger
+programme table.
+
+\subsubsection{What categories are there?}
+
+An application like BBC iPlayer may wish to query for a list of all
+categories so as to create a navigation menu that allows users
+to drill down into a particular category to see what is
+available thereunder.
+
+\begin{lstlisting}[language=SQL]
+  SELECT * FROM category
+  WHERE parent IS NULL
+  ORDER BY title;
+\end{lstlisting}
+
+Note that we have to match on null parents to select only
+top-level categories (we don't want to bombard a user with every
+possible subcategory until they choose to drill down futher). Had
+we been able to stick with our inheritance model that turned out
+not to be possible, we could have had a arguably more elegant
+query:
+
+\begin{lstlisting}[language=SQL]
+  SELECT * FROM ONLY category
+  ORDER BY title;
+\end{lstlisting}
+
+Where the \emph{ONLY} keyword ensures we only return things that
+are strictly categories and not from the subcategory child table.
+This is arguably clearer as could be seen to follow the
+\emph{Principle of Least Astonishment}
+\cite{saltzer2009principles}
+in that a programmer
+is not having to be aware of explicitly adding ``parent IS NULL''
+to a simple query for main categories only. It fits better with
+the mental model of programmers familiar with object-oriented
+programming to query for things of a given type than to filter
+based on a field that a top-level category does not even have
+at a semantic level. However, we are happy here to trade this
+off if PostgreSQL's inheritance model does not support our needs.
+
+\subsubsection{What subcategories are under my chosen category?}
+
+We can query the category table to find, say, all subcategories under
+the children's category:
+
+\begin{lstlisting}[language=SQL]
+  SELECT * FROM category
+  WHERE parent = '9100001'
+  ORDER BY title;
+\end{lstlisting}
+
+Again, we could have had a slightly clearer query with the inheritance
+model:
+
+\begin{lstlisting}[language=SQL]
+  SELECT * FROM subcategory
+  WHERE parent = '9100001'
+  ORDER BY title;
+\end{lstlisting}
+
+Where it is arguably clearer we are specifically looking for a subcategory.
+This is demonstrated further because we would be unable to do an accidental
+attempt to find a top-level category with a parent:
+
+\begin{lstlisting}[language=SQL]
+  SELECT * FROM category
+  WHERE parent = '9100001'
+  ORDER BY title;
+\end{lstlisting}
+
+With the inheritance model, the query above would fail as the category
+table has no parent field (only subcategories have parents), which
+could be seen to be more robust against programmer error.
+
+\subsubsection{What can I watch now within a single category?}
+
+If our users have navigated to their favourite category, we probably want
+to be able to query for everything that is available to watch right
+now within that category only:
+
+\begin{lstlisting}[language=SQL]
+  SELECT * FROM availability_window
+    JOIN programme ON availability_window.pid = programme.pid
+    JOIN programme_category
+      ON programme_category.pid = programme.pid
+  WHERE start_time <= now() AND end_time >= now()
+    AND programme_category.category_id = '9100001';
+\end{lstlisting}
+
+Note that we have no need to join on the whole category relation as the
+navigation should have given us the category ID, which we can filter
+sufficiently using only the programme\_category relation.
+
+\subsubsection{What's become available to watch for a particular TV/Radio channel?}
+
+This is a simple additional filter on the availability\_window relation:
+
+\begin{lstlisting}[language=SQL]
+  SELECT * FROM availability_window
+    JOIN programme ON availability_window.pid = programme.pid
+  WHERE start_time <= now() AND end_time >= now()
+    AND service = 'bbc_one';
+\end{lstlisting}
+
+\subsubsection{What can I watch that has a given tag?}
+
+This requires that we query within the tags array field:
+
+\begin{lstlisting}[language=SQL]
+  SELECT * FROM availability_window
+    JOIN programme ON availability_window.pid = programme.pid
+  WHERE start_time <= now() AND end_time >= now()
+    AND 'history' = ANY(tags);
+\end{lstlisting}
+
+\subsubsection{I want to add a new programme}
+
+Adding a new programme should be a simple, atomic insert into the programme
+table:
+
+\begin{lstlisting}[language=SQL]
+  INSERT INTO programme
+  (masterbrand, complete_title, pid, media_type, brand_pid, is_clip)
+  VALUES
+  ('cbbc', 'chucklevision:_series_18:_barryella', 'b0079214', 'video', 'b006w487', '0');
+\end{lstlisting}
+
+Fortunately, there is little inconsistency from simply adding links
+to any existing categories in a subsequent update:
+
+\begin{lstlisting}[language=SQL]
+  INSERT INTO programme_category
+  (pid, category_id)
+  VALUES
+  ('b0079214', '9100001');
+\end{lstlisting}
+
+It would not appear to be very harmful to have a programme in the database
+that does not yet have categories assigned (users would simply not be able to
+navigate to the programme easily until then) and there is no problem
+with referential integrity between those two updates. If, however,
+this situation is not acceptable even in a short time frame, we can bundle
+these updates within a single transaction. It should be discussed in the
+software requirements whether it is necessary to complicate the updates
+if there is little risk of consistency problems. It is reasonable that
+we would want our software to abandon the whole update if a content
+editor tries to add a programme to a non-existent category. Again,
+it is arguably more in line with the principle of least astonishment to
+fail to add any programme information if there is a mistake in the transaction.
+
+\subsubsection{I want to add a new programme with new tags}
+
+It is trivial to include as many tags as we want in our original programme
+insertion:
+
+\begin{lstlisting}[language=SQL]
+  INSERT INTO programme
+  (tags, masterbrand, complete_title, pid, media_type, brand_pid, is_clip)
+  VALUES
+  ('{"comedy", "silly"}', 'cbbc', 'chucklevision:_series_18:_barryella', 'b0079214', 'video', 'b006w487', '0');
+\end{lstlisting}
+
+Due to the earlier decision to create the tags field as a denormalised, free-form
+array of character strings against each programme, tagging a new programme
+with new or existing tags is exactly the same operation. Our update is unaffected
+by whether the tag is already present in the database or not. It is another
+question for the software requirements gathering as to whether it is
+acceptable that content editors can simply create tags in this loose manner (especially
+if they are fully capable of creating tags with spelling mistakes).
+
+\subsubsection{I want to add a new programme with a new category}
+
+This is equivalent to inserting a new programme against an existing category,
+except we must first do the update to insert the new category:
+
+\begin{lstlisting}[language=SQL]
+  INSERT INTO category (id, title) VALUES ('9100010', 'sport');
+\end{lstlisting}
+
+Again, there is a design decision to be made as to whether it is
+acceptable for the category to be inserted with the programme update
+then failing (and thus leaving the database with a category with no
+programmes therewithin) or whether it is preferable to do all
+three updates as a single transaction.
+
+\subsubsection{I want to correct a spelling mistake in a title}
+
+This is a simple, atomic update:
+
+\begin{lstlisting}[language=SQL]
+  UPDATE programme
+  SET complete_title = 'new title'
+  WHERE pid = 'abc123';
+\end{lstlisting}
+
+\subsubsection{I want to revoke a programme}
+
+There may be a case where a planned broadcast of a programme is
+cancelled for technical or legal reasons. If we have been populating
+our on-demand/catch-up service database with the availability
+window suggesting that users will be able to watch that programme soon,
+we will want to be able to remove a programme's record and associated
+availability.
+
+In a more simpler case where we just want to remove the availability of
+the programme to watch, we just need to remove its availability window
+(if we lose the rights to let people watch the programme on-demand):
+
+\begin{lstlisting}[language=SQL]
+  DELETE FROM availability_window
+  WHERE pid = 'abc123';
+\end{lstlisting}
+
+This deletion becomes less atomic if we need to cancel the programme
+altogether (i.e. remove its existence altogether as it's not
+even going to be broadcast on TV):
+
+\begin{lstlisting}[language=SQL]
+  DELETE FROM programme
+  WHERE pid = 'abc123';
+\end{lstlisting}
+
+This deletion will break foreign key constraints unless we either
+include a deletion of the availability window first or use
+\emph{ON CASCADE DELETE} with our foreign key reference to ensure
+that programme deletions always propagate to the
+availability\_window table as well.
 
 \section{XML Database}
 \subsection{Design}
 \subsection{Implementation}
 \subsection{Querying}
+\subsubsection{What can I watch right now?}
+\subsubsection{What categories are there?}
+\subsubsection{What subcategories are under my chosen category?}
+\subsubsection{What can I watch now within a single category?}
+\subsubsection{What's become available to watch for a particular TV/Radio channel?}
+\subsubsection{What can I watch that has a given tag?}
+\subsubsection{I want to add a new programme}
+\subsubsection{I want to add a new programme with new tags}
+\subsubsection{I want to add a new programme with a new category}
+\subsubsection{I want to correct a spelling mistake in a title}
+\subsubsection{I want to revoke a programme}
 
 \section{Document Database}
 \subsection{Design}
 \subsection{Implementation}
 \subsection{Querying}
+\subsubsection{What can I watch right now?}
+\subsubsection{What categories are there?}
+\subsubsection{What subcategories are under my chosen category?}
+\subsubsection{What can I watch now within a single category?}
+\subsubsection{What's become available to watch for a particular TV/Radio channel?}
+\subsubsection{What can I watch that has a given tag?}
+\subsubsection{I want to add a new programme}
+\subsubsection{I want to add a new programme with new tags}
+\subsubsection{I want to add a new programme with a new category}
+\subsubsection{I want to correct a spelling mistake in a title}
+\subsubsection{I want to revoke a programme}
 
 \section{Comparison}
 

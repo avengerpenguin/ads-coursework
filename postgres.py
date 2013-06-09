@@ -62,7 +62,7 @@ def replace_all(text, dic):
 
 
 programme_fields = {
-    'pid': 'varchar(12) PRIMARY KEY',
+    'pid': 'varchar(12)',
     'complete_title': 'varchar(256)',
     'media_type': "media_type",
     'masterbrand': 'varchar(40)',
@@ -74,34 +74,47 @@ print u"""
 BEGIN TRANSACTION;
 
 DROP TABLE IF EXISTS availability_window;
+DROP TABLE IF EXISTS programme_category;
+DROP TABLE IF EXISTS programme;
 DROP TABLE IF EXISTS subcategory;
 DROP TABLE IF EXISTS category;
-DROP TABLE IF EXISTS programme;
 DROP TYPE IF EXISTS media_type;
 
 CREATE TABLE category (
-  id    varchar(40) PRIMARY KEY,
-  title varchar(50)
+\tid\t\tvarchar(40),
+\ttitle\t\tvarchar(50),
+\tparent\t\tvarchar(40),
+\tPRIMARY KEY\t(id)
 );
 
-CREATE TABLE subcategory (
-  parent varchar(40) REFERENCES category(id)
-) INHERITS (category);
-
 CREATE TYPE media_type AS ENUM ('audio', 'video');
+
 CREATE TABLE programme ("""
 
-print ",\n".join(["\t{}\t{}".format(field_name, field_type)
+print ",\n".join(["\t{}{}{}".format(
+            field_name,
+            '\t' if len(field_name) > 7 else '\t\t',
+            field_type)
                   for field_name, field_type
-                  in programme_fields.iteritems()])
-print """);
+                  in programme_fields.iteritems()]) + ','
+print """\tPRIMARY KEY\t(pid)
+);
+
+CREATE TABLE programme_category (
+\tpid\t\tvarchar(40)
+\t\t\tREFERENCES programme(pid),
+\tcategory_id\tvarchar(40)
+\t\t\tREFERENCES category(id),
+\tPRIMARY KEY\t(pid, category_id)
+);
 
 CREATE TABLE availability_window (
-  pid        varchar(12) REFERENCES programme(pid),
-  start_time timestamp,
-  end_time   timestamp,
-  service    varchar(40),
-  PRIMARY KEY (pid, start_time, service)
+\tpid\t\tvarchar(12)
+\t\t\tREFERENCES programme(pid),
+\tstart_time\ttimestamp,
+\tend_time\ttimestamp,
+\tservice\t\tvarchar(40),
+\tPRIMARY KEY\t(pid, start_time, service)
 );
 """
 
@@ -109,7 +122,7 @@ categories = set()
 subcategories = set()
 programme_dicts = []
 
-with open('twoweek_proglist_utf8.csv', 'rb') as csvfile:
+with open('twoweek_proglist.csv', 'rb') as csvfile:
     for row in UnicodeDictReader(csvfile):
         row['tags'] = tagstring_to_postgres_array(row['tags'])
         if row['tags'] == u'{""}':
@@ -145,7 +158,7 @@ for category in categories:
         category.id, category.title)
 
 for subcategory in subcategories:
-    print u"INSERT INTO subcategory (id, title, parent) " +\
+    print u"INSERT INTO category (id, title, parent) " +\
         "VALUES ('{}','{}','{}');".format(
         subcategory.id, subcategory.title, subcategory.parent.id)
 
@@ -161,5 +174,14 @@ for programme in programme_dicts:
         int(programme['start_time']),
         int(programme['end_time']),
         programme['service'])
+
+    for category in programme['categories']:
+        print u"INSERT INTO programme_category (pid, category_id) " \
+            + "VALUES ('{}','{}');".format(programme['pid'], category.id)
+
+    for subcategory in programme['subcategories']:
+        print u"INSERT INTO programme_category (pid, category_id) " \
+            + "VALUES ('{}','{}');".format(programme['pid'], subcategory.id)
+
 
 print "COMMIT;"
