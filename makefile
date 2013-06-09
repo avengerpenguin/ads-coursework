@@ -41,7 +41,7 @@ pep8:
 	pep8 postgres.py
 
 postgres.sql: pep8
-	python postgres.py | tee postgres.sql
+	python postgres.py >postgres.sql
 
 postgres: postgres.sql
 	sudo -u postgres psql <postgres.sql
