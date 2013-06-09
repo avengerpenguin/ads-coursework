@@ -32,3 +32,4 @@
 *.tdo
 /ads-coursework.pdf
 plant_*.png
+/postgres.sql
