@@ -26,22 +26,28 @@ define run-latex
 endef
 
 clean:
-	-rm -f plant_*.png $(PDF) $(PDF:%.pdf=%.aux) $(PDF:%.pdf=%.bbl) $(PDF:%.pdf=%.blg) $(PDF:%.pdf=%.log) $(PDF:%.pdf=%.out) $(PDF:%.pdf=%.idx) $(PDF:%.pdf=%.ilg) $(PDF:%.pdf=%.ind) $(PDF:%.pdf=%.toc) $(PDF:%.pdf=%.d)
+	-rm -rf plant_*.png $(PDF) $(PDF:%.pdf=%.aux) $(PDF:%.pdf=%.bbl) $(PDF:%.pdf=%.blg) $(PDF:%.pdf=%.log) $(PDF:%.pdf=%.out) $(PDF:%.pdf=%.idx) $(PDF:%.pdf=%.ilg) $(PDF:%.pdf=%.ind) $(PDF:%.pdf=%.toc) $(PDF:%.pdf=%.d) *.pyc postgres.sql xml
 
 all: $(PDF)
 
 pdf: postgres.sql $(PDF)
 
-.PHONY	: all clean pdf
+.PHONY	: all clean pdf xml_dir xml_files pep8 postgres
 
 $(PDF) : %.pdf : %.tex
 	@$(run-latex)
 
 pep8:
-	pep8 postgres.py
+	pep8 *.py
 
 postgres.sql: pep8
 	python postgres.py >postgres.sql
 
 postgres: postgres.sql
 	sudo -u postgres psql <postgres.sql
+
+xml_dir:
+	mkdir -p xml
+
+xml_files: pep8 xml_dir
+	python exist.py

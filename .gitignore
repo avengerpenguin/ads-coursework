@@ -33,3 +33,5 @@
 /ads-coursework.pdf
 plant_*.png
 /postgres.sql
+*.pyc
+xml/*
