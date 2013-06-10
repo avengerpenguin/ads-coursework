@@ -67,6 +67,7 @@ and approaches are used to import this information into three different
 database systems.
 
 \section{Object-Relational}
+\label{sec:postgres}
 
 The Object-Relational database system used here is PostgreSQL, which supports
 pure relational databases and SQL, but also has support for objects and
@@ -758,7 +759,59 @@ that programme deletions always propagate to the
 availability\_window table as well.
 
 \section{XML Database}
+
+In this section, we will explore importing the same programmes dataset
+into an XML database. We will use \emph{eXist} as an example of such
+a database system and step through the same design-implement-query
+approach as used for PostgresSQL in section~\ref{sec:postgres}.
+
 \subsection{Design}
+
+Some of the discussion around the data model from section~\ref{sec:postgres}
+will apply also as we look at a design for an XML database, but
+in this section we can address any differences in the design approach.
+
+In the initial stages, individual \emph{entities} were identified in the
+dataset by stepping through the normalisation process methodically. It
+is still valid that the entities we care about are \emph{programmes},
+\emph{tags}, \emph{categories} (and \emph{subcategories}) and
+\emph{availability windows}, but with XML we choose to structure these
+very differently to the pure relation or the object-relational models.
+
+With an XML database such as \emph{eXist}, schema design is not strictly
+a barrier to being able to import information. So long as the data can
+be expressed in valid XML, we are able to import it given the tendency
+for XML databases to be intrinsically schemaless. Whilst this allows
+greater flexibility for what we choose to store, it can be difficult
+to query a database where all the documents have vastly different structures.
+Simple things like whether a field is called ``title'' or ``heading''
+can add unneeded complexity to querying applications that have to check
+for multiple possible fields.
+
+There is some value to keeping a consistent structure where possible
+and the benefit of using XML in our data store is that we get all
+the tooling and processes built for XML for free, including Xml Schema for
+validating documents before we import them. We will thus look at creating
+an XML Schema document (XSD) as part of the design phase, which we can
+use to validate document as we import them.
+
+We can use \lstinline|<xs:complexType>| to define a grouping of elements
+in a way that is analogous to defining a relation in a purely relational
+schema. In fact, an XML node and all its descendent nodes are actually an
+example of the \emph{aggregate model} in that a node tree defines an
+atomic entity with as much structure and complexity within that
+aggregate as necessary (i.e. it does not have to be a flat relation in
+normal form). In this way, we could design in such as way as to have
+a complexType defining an XML subtree for each object-relational aggregate
+we defined for PostgreSQL. If we follow this principle, we can create
+the stub XSD defining only the complex types shown in
+figure~\ref{fig:xsd-types}.
+
+\begin{figure}[p]
+  \caption{XSD defining a complexType for each of our aggregates}
+  \label{fig:xsd-types}
+\end{figure}
+
 \subsection{Implementation}
 \subsection{Querying}
 \subsubsection{What can I watch right now?}

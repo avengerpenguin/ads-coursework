@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+    <xs:simpleType name="media">
+        <xs:restriction>
+            <xs:enumeration value="video"/>
+            <xs:enumeration value="audio"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="programme">
+        <xs:all>
+            <xs:element name="pid"/>
+            <xs:element name="complete_title"/>
+            <xs:element name="media_type" type="media"/>
+            <xs:element name="masterbrand"/>
+            <xs:element name="brand_pid"/>
+            <xs:element name="is_clip"/>
+        </xs:all>
+        <xs:sequence>
+            <xs:element name="availability_window" type="availabilityWindow"/>
+            <xs:element name="category" type="category"/>
+            <xs:element name="tag"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="availabilityWindow">
+        <xs:sequence>
+            <xs:element name="start_time"/>
+            <xs:element name="end_time"/>
+            <xs:element name="service"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="category">
+        <xs:sequence>
+            <xs:element name="id"/>
+            <xs:element name="title"/>
+        </xs:sequence>
+    </xs:complexType>
+
+</xs:schema>
