@@ -28,7 +28,7 @@ endef
 clean:
 	-rm -rf plant_*.png $(PDF) $(PDF:%.pdf=%.aux) $(PDF:%.pdf=%.bbl) $(PDF:%.pdf=%.blg) $(PDF:%.pdf=%.log) $(PDF:%.pdf=%.out) $(PDF:%.pdf=%.idx) $(PDF:%.pdf=%.ilg) $(PDF:%.pdf=%.ind) $(PDF:%.pdf=%.toc) $(PDF:%.pdf=%.d) *.pyc postgres.sql xml
 
-all: $(PDF)
+all: pdf
 
 pdf: postgres.sql $(PDF)
 
@@ -50,4 +50,7 @@ xml_dir:
 	mkdir -p xml
 
 xml_files: pep8 xml_dir
+	xmllint --dtdvalid http://www.w3.org/2009/XMLSchema/XMLSchema.dtd programmes.xsd
 	python exist.py
+	for xmlfile in `ls xml`; do xmllint --schema programmes.xsd xml/$$xmlfile || exit 1 ; done
+

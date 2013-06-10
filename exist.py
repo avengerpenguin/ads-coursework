@@ -11,18 +11,23 @@ def xs_datetime(timestamp_string):
 def category_structure(programme):
     node = E.categories()
     for category in programme['categories']:
-        node.append(
-            E.category(
-                E.id(category.id),
-                E.title(category.title),
-                *[E.category(
-                        E.id(subcategory.id),
-                        E.title(subcategory.title)
-                        )
-                  for subcategory in programme['subcategories']
-                  if subcategory.parent is category]
+
+        category_node = E.category(
+            E.id(category.id),
+            E.title(category.title)
+        )
+
+        subcategories = [E.category(
+                E.id(subcategory.id),
+                E.title(subcategory.title)
                 )
-            )
+                         for subcategory in programme['subcategories']
+                         if subcategory.parent is category]
+
+        if subcategories:
+            category_node.append(E.categories(*subcategories))
+
+        node.append(category_node)
 
     return node
 
