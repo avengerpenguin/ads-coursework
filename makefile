@@ -50,7 +50,13 @@ xml_dir:
 	mkdir -p xml
 
 xml_files: pep8 xml_dir
-	xmllint --dtdvalid http://www.w3.org/2009/XMLSchema/XMLSchema.dtd programmes.xsd
 	python exist.py
+
+validate_xml: xml_files
+	xmllint --dtdvalid http://www.w3.org/2009/XMLSchema/XMLSchema.dtd programmes.xsd
 	for xmlfile in `ls xml`; do xmllint --schema programmes.xsd xml/$$xmlfile || exit 1 ; done
 
+exist: xml_files
+	/opt/eXist/bin/client.sh -m /db/programmes -p xml
+
+ads-coursework.pdf: xml_files

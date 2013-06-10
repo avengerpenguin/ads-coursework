@@ -803,23 +803,167 @@ atomic entity with as much structure and complexity within that
 aggregate as necessary (i.e. it does not have to be a flat relation in
 normal form). In this way, we could design in such as way as to have
 a complexType defining an XML subtree for each object-relational aggregate
-we defined for PostgreSQL. If we follow this principle, we can create
-the stub XSD defining only the complex types shown in
-figure~\ref{fig:xsd-types}.
+we defined for PostgreSQL.
+
+Following the principle of a complexType per entity, we could create
+a schema like that shown in figure~\ref{fig:xsd}.
 
 \begin{figure}[p]
+  \lstinputlisting[frame=single,language=XML,basicstyle=\scriptsize]{programmes.xsd}
   \caption{XSD defining a complexType for each of our aggregates}
-  \label{fig:xsd-types}
+  \label{fig:xsd}
 \end{figure}
 
+We have a simpleType which parallels the custom enum type used in the
+PostgreSQL database as well as a complexType per entity in the entity
+relational diagram shown in figure~\ref{fig:final_postgres}. There is one
+exception in that subcategories have not been modelled as a separate
+type. With XML we can use its hierachical, nested nature to compose
+a tree of categories (in that each \lstinline|<category>| tag may
+itself have its own \lstinline|<categories>| tag). Query languages such
+as Xpath and Xquery should permit us to search for top-level categories
+only, subcategories only and even across all categories and subcategories
+together (since their respective XML subtrees share the same complexType and
+are thus isomorphic). These three possibilities are what we would want
+from an inheritance model, so this nested composition could be said
+to be equivalent to subcategories inheriting from a parent category type.
+
+One important thing to note is that we have now denormalised the
+categories and replicated them across each programme. This has
+added a lot of redundancy, but is a simpler approach that makes better
+use of the hiearchical nature of XML, whereas references and foreign
+keys are not natively possible with XML documents. We will see how
+simple this keeps the queries when we come to pull information back
+out of the database.
+
 \subsection{Implementation}
+
+We can convert the data from the original CSV into multiple XML documents
+similar to the example shown in figure~\ref{xml-example} and then import
+into eXist with a single command:
+
+\begin{lstlisting}
+$ $EXIST_HOME/bin/client.sh -m /db/programmes -p *.xml
+\end{lstlisting}
+
+\begin{figure}[p]
+  \lstinputlisting[
+  frame=single,language=XML,basicstyle=\scriptsize,breakatwhitespace=false
+  ]{
+    xml/b00sn5cy.xml
+  }
+  \caption{Example XML representation of a programme}
+  \label{fig:xml-example}
+\end{figure}
+
 \subsection{Querying}
+
+In this section, we see how to query the XML collection using Xquery to
+achieve the same queries as performed in PostgreSQL.
+
 \subsubsection{What can I watch right now?}
+
+Rather than the join operator used in SQL, we can search amongst
+the nested availability windows using XQuery:
+
+\begin{lstlisting}
+xquery version "3.0";
+for $programme in //programme
+where $programme/availability/window/start_time < current-dateTime()
+  and $programme/availability/window/end_time > current-dateTime()
+return $programme
+\end{lstlisting}
+
 \subsubsection{What categories are there?}
+
+This is where the denormalisation of the categories becomes a difficulty.
+In order to find all unique top-level categories, we have to query all
+category tags across all programmes and aggregate them down to unique
+categories only:
+
+\begin{lstlisting}
+xquery version "3.0";
+let $all_categories := //programme/categories/category
+for $category_id in distinct-values($all_categories/id)
+let $categories := $all_categories[id=$category_id]
+let $category_title := $categories[1]/title/text()
+order by $category_title
+return 
+    <category>
+        <id>{$category_id}</id>
+        <title>{$category_title}</title>
+    </category>
+\end{lstlisting}
+
+In this case, we may have wished to create an XML collection for just
+category XML documents to aid quick retrieval of all categories. However,
+it becomes less clear how to maintain some referential integrity
+between programmes and their respective categories.
+
 \subsubsection{What subcategories are under my chosen category?}
+
+This is similar to the previous query:
+
+\begin{lstlisting}
+xquery version "3.0";
+
+let $all_subcategories := //programme/categories/category[id="9100098"]/categories/category
+for $subcategory_id in distinct-values($all_subcategories/id)
+let $subcategories := $all_subcategories[id=$subcategory_id]
+let $subcategory_title := $subcategories[1]/title/text()
+order by $subcategory_title
+return 
+    <category>
+        <id>{$subcategory_id}</id>
+        <title>{$subcategory_title}</title>
+    </category>
+\end{lstlisting}
+
+The advantage with the nested XML design is that we can alter the XPath at
+the top of the query to search all categories whether they are subcategories
+or not and we can easily scale to arbitrary levels of category nesting.
+
 \subsubsection{What can I watch now within a single category?}
+
+We can query for all available programmes within a given category or even subcategory:
+
+\begin{lstlisting}
+xquery version "3.0";
+for $programme in //programme[descendant::category/id='9200010']
+where $programme/availability/window/start_time < current-dateTime()
+  and $programme/availability/window/end_time > current-dateTime()
+return $programme
+\end{lstlisting}
+
 \subsubsection{What's become available to watch for a particular TV/Radio channel?}
+
+We can alter the first query to make sure we only match on availability of
+programmes broadcast originally on BBC One:
+
+\begin{lstlisting}
+xquery version "3.0";
+for $programme in /programme
+where $programme/availability/window[service='bbc_one']/start_time < current-dateTime()
+  and $programme/availability/window[service='bbc_one']/end_time > current-dateTime()
+return $programme
+\end{lstlisting}
+
+This turns out to be a very inefficient query without indexes. We should ensure
+that our eXist DB collection is indexing on the service field.
+
 \subsubsection{What can I watch that has a given tag?}
+
+We can search for available programmes with a given tag:
+
+\begin{lstlisting}
+xquery version "3.0";
+for $programme in //programme
+where $programme/tags/tag = 'science'
+  and $programme/availability/window/start_time < current-dateTime()
+  and $programme/availability/window/end_time > current-dateTime()
+return $programme
+\end{lstlisting}
+
 \subsubsection{I want to add a new programme}
 \subsubsection{I want to add a new programme with new tags}
 \subsubsection{I want to add a new programme with a new category}

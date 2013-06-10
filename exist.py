@@ -60,7 +60,8 @@ for programme in programme_dicts:
                 E.tags(
                     *[E.tag(unicode(tag_value, 'utf-8'))
                       for tag_value
-                      in tagstring_to_list(programme['tags'])]
+                      in tagstring_to_list(programme['tags'])
+                      if tag_value]
                      )
                 ),
             encoding='UTF-8',
