@@ -958,7 +958,7 @@ We can search for available programmes with a given tag:
 \begin{lstlisting}
 xquery version "3.0";
 for $programme in //programme
-where $programme/tags/tag = 'science'
+where $programme/tags/tag/text() = 'science'
   and $programme/availability/window/start_time < current-dateTime()
   and $programme/availability/window/end_time > current-dateTime()
 return $programme
@@ -966,15 +966,66 @@ return $programme
 
 \subsubsection{I want to add a new programme}
 
-As we look at adding and updating information, it should be noted that
-the XQuery language itself does not directly support updating. The
-extension \emph{XQuery Update Facility}, however, adds this functionality
-to the XQuery language.
+With eXist-db, there are multiple ways to import whole new documents. One
+simple way for us to add a new programme document to the collection
+is to use the command line Java admin client:
+
+\begin{lstlisting}
+bin/client.sh -m /db/programmes -p /path/to/xml/files
+\end{lstlisting}
+
+Alternatively, we can use XQuery Update syntax to add the new document:
+
+\begin{lstlisting}
+xquery version "3.0";
+declare namespace xmldb="http://exist-db.org/xquery/xmldb";
+xmldb:store('/db/programmes', 'abc123.xml', '<programe>...</programme>')
+\end{lstlisting}
 
 \subsubsection{I want to add a new programme with new tags}
+
+Given that are tags for a programme are contained within each programme
+document, there is nothing preventing entirely new tags being included
+in any document adding in the previous manner.
+
 \subsubsection{I want to add a new programme with a new category}
+
+Similarly to tags, categories are denormalised through all documents, so
+we can use any of the available ways to add new documents to include
+any categories -- new or existing -- in those documents.
+
 \subsubsection{I want to correct a spelling mistake in a title}
+
+We can remove a document and add a replacement if our client
+software simple wants to send a full document (based on an editor
+changing the information in a form and submitting it):
+
+\begin{lstlisting}
+xquery version "3.0";
+declare namespace xmldb="http://exist-db.org/xquery/xmldb";
+let $file-name := 'abc123.xml'
+let $remove-return-status := xmldb:remove('/db/programmes, $file-name)
+xmldb:store('/db/programmes', $file-name, <programe>...</programme>)
+\end{lstlisting}
+
+Another way is to do a direct update on the document node itself:
+
+\begin{lstlisting}
+xquery version "3.0";
+replace value of node fn:doc("abc123.xml")/programme/title
+with 'New title'
+\end{lstlisting}
+
 \subsubsection{I want to revoke a programme}
+
+\begin{lstlisting}
+xquery version "3.0";
+declare namespace xmldb="http://exist-db.org/xquery/xmldb";
+let $file-name := 'abc123.xml'
+xmldb:remove('/db/programmes, $file-name)
+\end{lstlisting}
+
+%$ <- makes emacs happy
 
 \section{Document Database}
 \subsection{Design}
