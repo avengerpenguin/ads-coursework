@@ -1134,16 +1134,16 @@ MongoDB's built-in \emph{\_id} field could equally be used.
 \begin{lstlisting}[language=json]
   [
     {
-      "id": "910003",
+      "id": "9100003",
       "name": "drama"
     },
     {
       "id": "9200018",
       "name": "crime",
-      "parent": "910003",
+      "parent": "9100003",
       "ancestors": [
         {
-          "id": "910003",
+          "id": "9100003",
           "name": "drama"
         }
       ]
@@ -1281,7 +1281,7 @@ case for searching by tag.
     "service": "bbc_two",
     "programme": {
       "pid": "abc123",
-      "categories": [{"id": "9100001", {"id": "9100002"}],
+      "categories": {"9100005": "factual", "9200041": "arts_culture_and_the_media"},
       "tags": ["history", "romans"]
     }
   }
@@ -1312,6 +1312,7 @@ string literals that happen to contain something that looks like a date
 and time as a date/time object.
 
 \subsection{Implementation}
+\label{sec:mongo-implementation}
 
 Implementation of a schemaless document store such as MongoDB is
 incredibly trivial. This is due to removing all the constraints
@@ -1322,19 +1323,234 @@ our design is to install MongoDB and write our application code so that
 it starts doing the correct update and select queries.
 
 \subsection{Querying}
-\label{sec:mongo-querying}.
+\label{sec:mongo-querying}
+
+As stated in section~\ref{sec:mongo-implementation}, a MongoDB database
+design manifests in the queries more than in any setup. We do not need
+to design a schema ahead of time, but simply write our application such
+that its select queries pull out information in the same format that
+as the documents added via its insertion queries.
+
+There are libraries and middleware such as \emph{mongoengine} (for
+Python) and \emph{MongoMapper} (for Ruby) that allow a compromise
+whereby a schema can be defined in a class structure, which is
+then used by the application code. This is a good separation of concerns
+with which the rest of the application is unable to insert or fetch
+documents that do not meet expectations. However, the underlying
+schemaless nature of MongoDB itself means it is easy to update
+the schema that is defined in these model libraries and perhaps
+certain operations can add additional fields to need later on. Effectively,
+this allows applications to work to a rigid schema, but without the
+database being the enforcer thereof.
+
+For the queries to follow, we will assume raw queries with the MongoDB
+shell without the benefits of any such middleware.
 
 \subsubsection{What can I watch right now?}
+
+With availability mapped in its own collection, we just need to query
+for windows in that collection whose times fall either side of the
+current time:
+
+\begin{lstlisting}[language=json]
+  var currentTime = new Date();
+  db.availability.find({
+    'start_time': {$lt: currentTime},
+    'end_time': {$gt: currentTime}
+  });
+\end{lstlisting}
+
+Of course, if we implement the TTL feature such that availability
+window documents are removed automatically by MongoDB when the end time
+is reached, we simply have to do:
+
+\begin{lstlisting}[language=json]
+  db.availability.find();
+\end{lstlisting}
+
 \subsubsection{What categories are there?}
+
+If we want only top-level categories, we can query for all categories
+without a parent:
+
+\begin{lstlisting}[language=json]
+  db.categories.find({"parent": {"$exists": false}});
+\end{lstlisting}
+
 \subsubsection{What subcategories are under my chosen category?}
+
+If a user has navigated to a category and we want to list the available
+subcategories, we can query for all categories that have that parent:
+
+\begin{lstlisting}[language=json]
+  db.categories.find({"parent": category_id});
+\end{lstlisting}
+
 \subsubsection{What can I watch now within a single category?}
+
+Having denormalised the categories of a programme so that they appear
+on availability windows as well, we can easily query for all
+availability windows within any programme category:
+
+\begin{lstlisting}[language=json]
+  db.availability.find({"programme.categories.9100001": {"$exists": "true"}});
+\end{lstlisting}
+
 \subsubsection{What's become available to watch for a particular TV/Radio channel?}
+
+This should be as easy as querying for availability windows, but with an
+additional filter on service:
+
+\begin{lstlisting}[language=json]
+  db.availability.find({"service": "bbc_two"});
+\end{lstlisting}
+
 \subsubsection{What can I watch that has a given tag?}
+
+To query amongst programmes with a given tag, we can just match our
+tags value on the
+array field and MongoDB will understand we are matching within
+a list:
+
+\begin{lstlisting}[language=json]
+  db.availability.find({"programme.tags": "history"});
+\end{lstlisting}
+
 \subsubsection{I want to add a new programme}
+
+When we add a new programme, we may want to add its availability
+window as well. This is where we have to ensure consistency by
+always doing two queries together:
+
+\begin{lstlisting}[language=json]
+  db.programmes.insert(
+  {
+    pid: "abc123",
+    complete_title: "Programme Title Here",
+    media_type: "video",
+    "masterbrand": "bbc_one",
+    "is_clip": 0,
+    "categories": [
+      {id: "9100005", name: "factual"),
+      {id: "9200041", name: "arts_culture_and_the_media")
+    ],
+    "tags": ["history", "romans"]
+  },
+  );
+  db.availability.insert(
+  {
+    "start_time": new Date("2012-08-20T05:32:00"),
+    "end_time": new Date("2012-08-27T05:32:00"),
+    "service": "bbc_two",
+    "programme": {
+      "pid": "abc123",
+      "categories": {"9100005": "factual", "9200041": "arts_culture_and_the_media"},
+      "tags": ["history", "romans"]
+    }
+  }
+  );
+\end{lstlisting}
+
+This, of course, can be ensured in application code with a helper function
+such as $addProgramme(programme_details, availability_details)$.
+
 \subsubsection{I want to add a new programme with new tags}
+
+Given that tags are modelled as string literals, this is no different to adding
+a programme as above, but using string literals that aren't already in use.
+
 \subsubsection{I want to add a new programme with a new category}
+
+This is another case where we need multiple inserts and risk inconsistency.
+Given that transactions do not fit into the way of doing things in MongoDB,
+we should instead look at the application needs to ascertain the impact
+of inconsistency. It is likely that it is less harmful for a programme to be
+added under a category that is not yet navigable than it is for a category
+to appear in the navigation that links to a programme that does not exist yet
+(e.g. an HTTP 404 would be encountered in a web application). To this
+end, we can add our programme before adding the new category:
+
+\begin{lstlisting}[language=json]
+  db.programmes.insert(
+  {
+    pid: "abc123",
+    complete_title: "Programme Title Here",
+    media_type: "video",
+    "masterbrand": "bbc_one",
+    "is_clip": 0,
+    "categories": [
+      {id: "9100005", name: "factual"),
+      {id: "9200041", name: "arts_culture_and_the_media")
+    ],
+    "tags": ["history", "romans"]
+  },
+  );
+  db.categories.insert(
+    {
+      "id": "9200041",
+      "name": "arts_culture_and_the_media",
+      "parent": "9100005",
+      "ancestors": [
+        {
+          "id": "9100005",
+          "name": "factual"
+        }
+      ],
+      "programmes": [
+        "abc123"
+      ]
+    }
+  );
+  db.availability.insert(
+  {
+    "start_time": new Date("2012-08-20T05:32:00"),
+    "end_time": new Date("2012-08-27T05:32:00"),
+    "service": "bbc_two",
+    "programme": {
+      "pid": "abc123",
+      "categories": {"9100005": "factual", "9200041": "arts_culture_and_the_media"},
+      "tags": ["history", "romans"]
+    }
+  }
+  );
+\end{lstlisting}
+
+If we truly want this to be transactional, the MongoDB
+documentation suggests \cite{mongo-two-phase-commits} that it
+is best to do so with a ``state'' property on the documents.
+Following this, we could put "state: pending" on the programme
+whose category is not yet added, then update said property
+to "committed" after the category is added. This is enforcing
+consistency within the data model and we can ensure we only
+search for programmes, categories, etc. that we know are in
+a committed state. It is unlikely this level of control is needed
+for a programmes catch-up service, however.
+
 \subsubsection{I want to correct a spelling mistake in a title}
+
+Updating a single programme document is fairly simple:
+
+\begin{lstlisting}[language=json]
+  db.programmes.update({pid: "abc123"}, {$set: {"complete_title": "New Title"}}});
+\end{lstlisting}
+
+However, we need to remember that we have denormalised programme
+information across the programmes and availability collections:
+
+\begin{lstlisting}[language=json]
+  db.programmes.update({pid: "abc123"}, {$set: {"complete_title": "New Title"}}});
+  db.availability.update({programme.pid: "abc123"}, {$set: {"programme.complete_title": "New Title"}}}, {multi: true});
+\end{lstlisting}
+
 \subsubsection{I want to revoke a programme}
+
+We have to ensure we purge the programme from all collections:
+
+\begin{lstlisting}[language=json]
+  db.programmes.delete({pid: "abc123"});
+  db.availability.delete({programme.pid: "abc123"});
+  db.categories.update({}, {$pull: "abc123"}, {multi: true});
+\end{lstlisting}
 
 \section{Comparison}
 
