@@ -35,3 +35,4 @@ plant_*.png
 /postgres.sql
 *.pyc
 xml/*
+*~

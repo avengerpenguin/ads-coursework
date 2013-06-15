@@ -1312,6 +1312,15 @@ string literals that happen to contain something that looks like a date
 and time as a date/time object.
 
 \subsection{Implementation}
+
+Implementation of a schemaless document store such as MongoDB is
+incredibly trivial. This is due to removing all the constraints
+of a relational database (with the obvious trade-offs). We can use
+any language such as the Javascript used for the MongoDB shell to
+start inserting objects without any prior setup. All we need to implement
+our design is to install MongoDB and write our application code so that
+it starts doing the correct update and select queries.
+
 \subsection{Querying}
 \label{sec:mongo-querying}.
 
