@@ -109,19 +109,11 @@ is distributed across relations between many tuples. \cite{sadalage2012nosql}
 
 \subsection{Design}
 
-The first benefit of the relational model (which is treated here as a strict
-subset of the object-relational model) is that our comma-separated source
-data can be na\"ively imported as a single relation, with one row of the CSV
-file being stored as exactly one row in the relation. This is shown in
-Figure~\ref{fig:single-relation}. This seems
-to be the path of least resistance if we simply want to stage the data
-in a database system quickly so as to begin queries against it, but is
-likely losing some of the benefits of the relational model and is unlikely
-to be in a normal form.
-
-We can proceed initially to normalise the table as far as possible in
-a pure relational model and then look to see what benefits can be gained
-from introducing objects as in the object-relational model.
+We can create a very na\"ive design that simply treats each row in the
+CSV file as a single relation. This is shown in figure~\ref{fig:single-relation}.
+This is clearly not even in first normal form \cite{codd1972further}
+and a purely relational database
+is not going to handle the list of tags nor the complex category structures.
 
 \subsubsection{Pure Relational Model}
 
@@ -152,19 +144,6 @@ from introducing objects as in the object-relational model.
   \label{fig:single-relation}
 \end{figure}
 
-The other problem with importing a whole row into a single relation is that
-a pure relational database system is probably not going to be able to deal
-with the categories and tags columns, which are both lists. Without support
-for lists or arrays, the only compromise we would have is to import them
-as raw string types and leave it to the application code to parse and break
-apart those strings to derive further meaning from them. The consequence of
-this is that there is no elegant way to query based on the contents of
-the categories or tags fields, which is unhelpful if the intention is to
-serve an application that wishes to allow searching by tag or category.
-
-The presence of multiple values in the categories and tags fields already
-means our single relation model is not even in First Normal Form (1NF).
-\cite{codd1972further}
 An obvious next step is to create relations for categories and for tags,
 with relations. This would produce something similar to
 Figure~\ref{fig:cat-tags-rel}.
@@ -204,71 +183,9 @@ Figure~\ref{fig:cat-tags-rel}.
   \label{fig:cat-tags-rel}
 \end{figure}
 
-The schema so far is still not in Second Normal Form (2NF),
-however. Whilst it may not be the case in the exact data set
-at hand, there is a distinct possibility we will want our database
-to store a programme that has been repeated and thus becomes eligible
-for watching on a catch-up service within a second window of time.
-In this case the best candidate key for the table would be a tuple
-including the pid and at least the start time (if not the end time
-as well) of the catch-up availability window.
-
-With a composite key of the pid and the time, we can clearly see
-that non-prime attributes such as the programme's master brand, tags
-or media type are dependent on just the programme identifier subset
-of the key, not the time slots. Thus if we wish to take our schema
-design into 2NF, we need to break apart the programme information
-and the time windows into their own relations as shown in
-Figure~\ref{fig:2nf}.
-
-\begin{comment}
-  @startuml plant_2nf.png
-  class Programme {
-    pid
-    complete_title
-    media_type
-    masterbrand
-    brand_pid
-    is_clip
-  }
-  class AvailabilityWindow {
-    start_time
-    end_time
-    epoch_start
-    epoch_end
-    service
-  }
-  class Category {
-    id
-    level
-    title
-  }
-  class Tag {
-    title
-  }
-  Programme "1" -d- "0..*" AvailabilityWindow
-  Programme "0..*" -r- "0..*" Category
-  Programme "0..*" -l- "0..*" Tag
-  @enduml
-\end{comment}
-\begin{figure}[p]
-  \begin{center}
-    \includegraphics[width=\linewidth]{plant_2nf.png}
-  \end{center}
-  \caption{Programme and availability windows separated for 2NF}
-  \label{fig:2nf}
-\end{figure}
-
-So, the remaining problem that is keeping the design from being in
-Third Normal Form (3NF) is there is a functional dependency
-between the start and end timestamps and the same times expressed
-in ISO 8601 format. Rather than this being a case for refactoring
-out to another relation however, we can simply opt to store
-our start and end times in a single format and leave it up to queries
-to choose to convert to the desired format later on. In fact, the
-\emph{timestamp} data type with PostgreSQL is perfectly suitable
-here. This then leaves us with our final relational model in 3NF
-as shown in Figure~\ref{fig:3nf}
+We can do a lot more normalisation and achieve the model shown in
+figure~\ref{fig:3nf}. Note also that the redundancy of having both
+timestamps and date strings in ISO 8601 format is removed.
 
 \begin{comment}
   @startuml plant_3nf.png
@@ -305,23 +222,6 @@ as shown in Figure~\ref{fig:3nf}
   \caption{Removed date redundancy allows the model to be in 3NF}
   \label{fig:3nf}
 \end{figure}
-
-We might find that we can achieve stricter normal forms with
-media type being dependent on the service or the master brand
-(i.e. radio services will only broadcast audio and TV services
-will always broadcast video), but for this design we will stop short
-of looking to go into Forth Normal Form (4NF) or stricter.
-\cite{fagin1977multivalued}
-In a real business application, it's hard to make that assumption
-without confirmation of the requirements (maybe a TV service will
-broadcast an audio-only programme one day). It is also something to keep in
-mind given that tables found to be violating 4NF can be very common
-in business applications. \cite{wu1992practical} In our case, it is
-entirely possible for a client application to insert a programme on
-BBC Radio Four with the media type \emph{video}. Before building
-this database for a real application, we would likely clarify whether
-that is an acceptable state or whether such a row would be considered
-inconsistent.
 
 When we come to implement the entities and their respective relations
 as shown in figure~\ref{fig:3nf}, we would create the following relations:
