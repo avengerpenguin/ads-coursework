@@ -275,27 +275,9 @@ not easily store them as primitive strings, but the possibility of an
 array of foreign key references to the Category relation is there. Another
 option is that of an array of a custom \emph{composite} type.
 
-With a composite type, we could create a category type and use that within
-an array in our Programme relation. However, categories are likely to be
-used very differently to tags in that they are commonly used to
-drive hierarchical navigation in a user interface, allowing users
-to browse categories of interest for the latest or most popular items
-therewithin.
-
 Given that we might (almost) equally query for programmes or categories,
 we probably still want to keep their respective relations and rely on
-JOIN queries to link the two when needed. It is not unreasonable to
-expect an application where the categories themselves are rarely changed,
-but programmes are individually added in frequent updates against these
-relatively static categories. Thus we would have rare need for rapid,
-expensive transactions where both tables need updating atomically. In
-the rare cases where a category is added along with a programme,
-we could easily pay the performance cost on such a one-off update.
-
-The option of a composite type should be kept for consideration (perhaps
-if further requirements gathering indicates it is a better approach),
-but with the assumptions made so far, there seems to be little
-case for it.
+JOIN queries to link the two when needed.
 
 Another question is whether to model the hierarchical nature of the
 category entity. The level attribute of a category (so far only values
