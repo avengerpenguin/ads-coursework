@@ -2,6 +2,7 @@
 
 \usepackage{verbatim}
 \usepackage{graphicx}
+\usepackage{xcolor}
 \usepackage{listings}
 \lstset{
   breakatwhitespace=true,
@@ -10,20 +11,15 @@
 }
 
 \colorlet{punct}{red!60!black}
-\definecolor{background}{HTML}{EEEEEE}
 \definecolor{delim}{RGB}{20,105,176}
 \colorlet{numb}{magenta!60!black}
 
 \lstdefinelanguage{json}{
     basicstyle=\normalfont\ttfamily,
-    numbers=left,
-    numberstyle=\scriptsize,
     stepnumber=1,
     numbersep=8pt,
     showstringspaces=false,
     breaklines=true,
-    frame=lines,
-    backgroundcolor=\color{background},
     literate=
      *{0}{{{\color{numb}0}}}{1}
       {1}{{{\color{numb}1}}}{1}
@@ -873,7 +869,7 @@ out of the database.
 \subsection{Implementation}
 
 We can convert the data from the original CSV into multiple XML documents
-similar to the example shown in figure~\ref{xml-example} and then import
+similar to the example shown in figure~\ref{fig:xml-example} and then import
 into eXist with a single command:
 
 \begin{lstlisting}
@@ -1082,34 +1078,34 @@ treat JSON as equivalent for the purposes of design)
 documents that follow the same principles as shown in figure~\ref{fig:big-json-doc}.
 
 \begin{figure}[p]
-\begin{lstlisting}[language=json]
-  {
-    "pid": "abc123",
-    "complete_title": "Programme Title Here",
-    "media_type": "video",
-    "masterbrand": "bbc_one",
-    "is_clip": 0,
-    "availability": [
+  \begin{lstlisting}[language=json]
+    {
+      "pid": "abc123",
+      "complete_title": "Programme Title Here",
+      "media_type": "video",
+      "masterbrand": "bbc_one",
+      "is_clip": 0,
+      "availability": [
       {
         "start_time": new Date("2012-08-20T05:32:00"),
         "end_time": new Date("2012-08-27T05:32:00"),
         "service": "bbc_two"
       }
-    "categories": [
+      "categories": [
+      {
+        "id": "910003",
+        "name": "drama",
+        "categories": [
         {
-          "id": "910003",
-          "name": "drama",
-          "categories": [
-            {
-              "id": "9200018",
-              "name": "crime"
-            }
-          ]
+          "id": "9200018",
+          "name": "crime"
         }
+        ]
+      }
       ]
-    ]
-  }
-\end{listlisting}
+      ]
+    }
+  \end{lstlisting}
   \caption{JSON version of document structure as defined in XML earlier}
   \label{fig:big-json-doc}
 \end{figure}
@@ -1149,7 +1145,7 @@ MongoDB's built-in \emph{\_id} field could equally be used.
       ]
     }
   ]
-\end{listlisting}
+\end{lstlisting}
   \caption{Suggested method of modelling category hierarchies in MongoDB}
   \label{fig:json-categories}
 \end{figure}
@@ -1239,7 +1235,7 @@ in figure~\ref{fig:mongo-availability-window}.
     "service": "bbc_two",
     "programme": "abc123"
   }
-\end{listlisting}
+\end{lstlisting}
   \caption{Availability window modelled in MongoDB}
   \label{fig:mongo-availability-window}
 \end{figure}
@@ -1285,7 +1281,7 @@ case for searching by tag.
       "tags": ["history", "romans"]
     }
   }
-\end{listlisting}
+\end{lstlisting}
   \caption{Availability window modelled with further denormalisation}
   \label{fig:mongo-availability-denormal}
 \end{figure}
@@ -1531,15 +1527,19 @@ for a programmes catch-up service, however.
 Updating a single programme document is fairly simple:
 
 \begin{lstlisting}[language=json]
-  db.programmes.update({pid: "abc123"}, {$set: {"complete_title": "New Title"}}});
+  db.programmes.update({pid: "abc123"},
+    {$set: {"complete_title": "New Title"}}});
 \end{lstlisting}
 
 However, we need to remember that we have denormalised programme
 information across the programmes and availability collections:
 
 \begin{lstlisting}[language=json]
-  db.programmes.update({pid: "abc123"}, {$set: {"complete_title": "New Title"}}});
-  db.availability.update({programme.pid: "abc123"}, {$set: {"programme.complete_title": "New Title"}}}, {multi: true});
+  db.programmes.update({pid: "abc123"},
+    {$set: {"complete_title": "New Title"}}});
+  db.availability.update({programme.pid: "abc123"},
+    {$set: {"programme.complete_title": "New Title"}}},
+    {multi: true});
 \end{lstlisting}
 
 \subsubsection{I want to revoke a programme}
@@ -1549,7 +1549,9 @@ We have to ensure we purge the programme from all collections:
 \begin{lstlisting}[language=json]
   db.programmes.delete({pid: "abc123"});
   db.availability.delete({programme.pid: "abc123"});
-  db.categories.update({}, {$pull: "abc123"}, {multi: true});
+  db.categories.update({},
+    {$pull: "abc123"},
+    {multi: true});
 \end{lstlisting}
 
 \section{Comparison}
