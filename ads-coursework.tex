@@ -1556,6 +1556,164 @@ We have to ensure we purge the programme from all collections:
 
 \section{Comparison}
 
+A few of the advantages and drawbacks of each database system
+and the respective design for our dataset have been discussed along
+the way. In this section, we will summarise some of the comparison
+points and discuss which of the three systems is strongest in each
+area. As always, we would normally endeavour to collect more
+substantial user requirements for the software applications
+that intend to use the data store, so in many areas there
+is likely no ``clear cut'' winner whilst we are speculating many
+of these requirements.
+
+\subsection{Ease of design and implementation}
+
+\begin{itemize}
+  \item RDBMS and SQL have familiarity amongst programmers.
+  \item RDBMS suffer from object-relational impedance mismatch
+  \item MongoDB documents are more similar to the object data
+    structures used by programmers.
+  \item MongoDB is capable of modelling even complex things
+    when you embrace the denormalisation required, but it can
+    feel like you are recreating features (e.g. foreign keys,
+    tree structures) within the documents that come for free as
+    part of other systems.
+  \item The XML representation ``feels'' more natural for arranging
+    as a hierarchy and searching descendants.
+  \item Fetching XML from a database might appeal if the application
+    is an XML-based API (XSLT and XSD can be used to transform
+    and validate with need for a large amount of bespoke, imperative
+    code).
+\end{itemize}
+
+This is perhaps the most pragmatic comparison for choosing which
+database system to use, based not just on software requirements, but
+also on the preferences and ability of the team building the applications.
+
+MongoDB appears to offer the greatest flexibility to allow the developers
+to start building the application and simply persist
+the data structures that emerge in the application. In
+a general software project with requirements not fully known, it might
+be the best option so as to avoid tricky schema migrations as
+the use cases are more fleshed out in time.
+
+PostgreSQL and eXist are stronger contenders if there is greater
+familiarity with SQL or XML or if other advantages thereof outweigh
+the loose, flexible benefits of MongoDB.
+
+\subsection{Performance}
+
+\begin{itemize}
+  \item MongoDB was developed primarily for rapid scaling, perhaps by
+    trading off consistency.
+  \item Almost any database can be performant if designed in the right
+    way with the right indexes.
+  \item MongoDB allows us to denormalise into different collections, e.g.
+    to fetch a list of categories or a list of programmes.
+  \item PostgreSQL allows us to fetch from either categories or programmes
+    without trading off normalisation.
+  \item With eXist, we have to decide whether a programme or a category
+    is the top-level element and searching amongst descendants could get
+    cumbersome.
+\end{itemize}
+
+This is a comparison that is brought up a lot in database discussions, but
+could well be the least of a project's concerns. Clearly, MongoDB's focus
+on denormalising information to everywhere it's needed and the
+``fire and forget'' manner of updates by default allows for rapid storage
+of a lot of information with a number of trade-offs to achieve that. Most
+systems can be made to perform however and arguably more time should
+be spent considering data integrity, consistency and other pragmatic aspects
+rather than optimising prematurely.
+
+\subsection{Data Integrity}
+
+\begin{itemize}
+  \item PostgreSQL and relational databases in general are certainly the
+    most noted for maintaing data integrity with foreign keys, unique
+    (and other) constraints and transaction support.
+  \item PostgeSQL's object-relational style allows small amounts of
+    integrity to be traded-off (e.g. storing all the tags as string
+    arrays rather than enforce all programmes reference the same set).
+  \item The drawback with relational databases is having to use transactions
+    around updates to multiple tables when an atomic update to a single
+    aggregate in XML or MongoDB's documents would be sufficient and perhaps
+    more performant.
+  \item MongoDB enforces zero to no data integrity, but there are
+    application libraries that allow it to be enforced in the software
+    itself.
+  \item XML databases like eXist are strictly schemaless, but generally
+    such systems support the XML Schema standard for validation.
+  \item More recent standards like JSON schema could be employed for
+    a quick and simple validation layer in an application persisting
+    to MongoDB.
+\end{itemize}
+
+Clearly, PostgreSQL is a clear winner if we want absolute certainty
+about the data staying in a consistent state. It is not impossible
+to achieve some kind of schema or validation in the other two systems,
+but sometimes these can hide the benefits NoSQL databases provide
+by being not so rigid.
+
+\subsection{Update Consistency}
+
+\begin{itemize}
+  \item Transactions in PostgreSQL can ensure no query sees
+    ``half'' an update (e.g. a new category looking empty
+    before a new programme is added to it).
+  \item Document and XML stores like MongoDB and eXist can make
+    transactions unnecessary by storing aggregate structures
+    that represent the atomic updates the application is going to make.
+  \item Once we start denormalising documents for better queries,
+    we introduce the need for multi-step updates.
+  \item It is down to requirements to decide the harm of a partial
+    update being seen (e.g. is it all that harmful to have an empty
+    category for up to a second before the programme is added to it?)
+\end{itemize}
+
+\subsection{Maturity and Community Support}
+
+\begin{itemize}
+  \item SQL databases now have decades of optimisation, development tool
+    support and 3rd party libraries available. Their continuing
+    popularity assures that there is much support in the community for any
+    issues or learning.
+  \item XML databases also benefit from many years of popularity around
+    XML itself and the ecosystem around it (XSLT, XSD, etc.) Falling popularity
+    in favour of JSON might mean the community support is also declining however.
+  \item Furthermore, few XML databases are in active development compared
+    with alternatives, which suggests the community support is not as
+    pervasive.
+  \item MongoDB is relatively new in comparison, but has matured enough
+    to be in use on major production environments. \cite{mongo-production} It
+    also has a large number of client APIs in multiple languages.
+\end{itemize}
+
+Maturity might be an issue like performance where there are more important
+aspects to consider. The ``tried and tested'' feature of PostgreSQL might
+give some assurance around performance, but that should not deter a
+project from considering eXist or MongoDB if they have enough benefits to
+outweigh it.
+
+In modern software development, community support can be a very important
+factor. If a system or application is relatively new, there is some strength
+in there being a large, active community around it. It ensures that
+any problems have been seen by a number of eyes and that any developers
+we may hire are likely to have prior knowledge of the system.
+
+\subsubsection{Conclusion}
+
+The overall message is that choosing a database system comes down to
+understanding your needs and there are few objective factors that
+make one system entirely ``better'' than another. The other important
+consideration is that a database forms only one part of a software
+application architecture and too much focus on all the academic
+differences between different systems might distract from progress
+on the core functionality of the application.
+
+Thust the questions we should be asking are: \emph{what do we need?}
+and \emph{how much does it matter?}
+
 \bibliographystyle{cell}
 \bibliography{bibtex}
 \end{document}
