@@ -238,7 +238,7 @@ as shown in figure~\ref{fig:3nf}, we would create the following relations:
 So, what benefits can we can from the non-SQL or object-like features of
 PostgreSQL over and above the pure relational mode?
 
-\subsubsection{Aggregate model and array fields}
+\subsubsection{Aggregates and object-relational}
 
 If we wanted to search for a set of programmes along with their tags, we would
 have to do a JOIN query each time. With very large Programme and Tag tables, this
@@ -248,13 +248,8 @@ In a more aggregate-oriented approach, we could treat the tags as an
 intrinsic part of a programme \emph{aggregate} -- we would only want to update
 the tags within the context of updating a programme and we're hardly
 ever likely to query a Tag relation independently of the Programme relation.
-With this, we could employ an array type within PostgreSQL with either the
-arrays pointing to a table of all potential Tag values
-(using \emph{ELEMENT REFERENCES})
-or the arrays containing string values of the tags themselves. With string
-arrays, we lose the consistency of being able to update a tag itself (say,
-for spelling corrections), but we have a far faster way of changing the tags
-of a programme whilst updating the programme aggregate as a whole.
+With this, we could employ an array type within PostgreSQL  containing string
+values.
 
 Note that updating the aggregate atomically in this way removes the need
 to use transactions, which would be necessary if we were both updating the
@@ -262,29 +257,14 @@ Tag and Programme relations in a single update. Again, we could see some
 real performance gains if this database were receiving a lot of updates and
 would otherwise be subject to a lot of locking and contention. \cite{sadalage2012nosql}
 
-The consistency then arguably becomes easier to maintain were we to scale
-to a distributed database model. If a programme is modelled as an aggregate
-containing its own tags, then an atomic update of a programme and its tags
-can be replicated across nodes eventually without worry that the update
-to the programme may synchronise before the update containg the new tag it's
-supposed to have gained. In the pure relational model, we would have used
-transactions to keep the two updates together; with the aggregate model,
-that need is removed.
-
-The key to a lot of this debate around the tags for a programme really lies
-in how the business intends for that information to be used. Generally,
-the concept of tagging is a loose way to add textual metadata to a
+It comes down to how business applications intend to use the tags.,
+The concept of tagging is normally a loose way to add textual metadata to a
 business object to aid searches, automatic aggregation and even data
 mining potential (e.g. this user likes things with this particular tag,
 so we can suggest them more content with similar tags).
 
 Tagging is something that can even somewhat benefit from being unconstrained
 and freely chosen as the item is added or updated. \cite{smith2008tagging}
-It is also arguable that the harm in a tag being spelled incorrectly
-on one programme is a minor harm (given it is additional metadata that
-does not harm normal navigation nor basic application functions) when
-compared to the benefit given to editors and content producers that
-they can add as many tags freely as they please to their content items.
 
 \subsubsection{Modelling programme categories}
 
