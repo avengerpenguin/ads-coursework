@@ -594,31 +594,12 @@ approach as used for PostgresSQL in section~\ref{sec:postgres}.
 
 \subsection{Design}
 
-Some of the discussion around the data model from section~\ref{sec:postgres}
-will apply also as we look at a design for an XML database, but
-in this section we can address any differences in the design approach.
-
-In the initial stages, individual \emph{entities} were identified in the
-dataset by stepping through the normalisation process methodically. It
-is still valid that the entities we care about are \emph{programmes},
-\emph{tags}, \emph{categories} (and \emph{subcategories}) and
-\emph{availability windows}, but with XML we choose to structure these
-very differently to the pure relation or the object-relational models.
-
 With an XML database such as \emph{eXist}, schema design is not strictly
 a barrier to being able to import information. So long as the data can
-be expressed in valid XML, we are able to import it given the tendency
-for XML databases to be intrinsically schemaless. Whilst this allows
-greater flexibility for what we choose to store, it can be difficult
-to query a database where all the documents have vastly different structures.
-Simple things like whether a field is called ``title'' or ``heading''
-can add unneeded complexity to querying applications that have to check
-for multiple possible fields.
+be expressed in valid XML, we are able to import it.
 
-There is some value to keeping a consistent structure where possible
-and the benefit of using XML in our data store is that we get all
-the tooling and processes built for XML for free, including Xml Schema for
-validating documents before we import them. We will thus look at creating
+There is some value however to keeping a consistent structure where possible.
+We will thus look at creating
 an XML Schema document (XSD) as part of the design phase, which we can
 use to validate document as we import them.
 
@@ -627,10 +608,7 @@ in a way that is analogous to defining a relation in a purely relational
 schema. In fact, an XML node and all its descendent nodes are actually an
 example of the \emph{aggregate model} in that a node tree defines an
 atomic entity with as much structure and complexity within that
-aggregate as necessary (i.e. it does not have to be a flat relation in
-normal form). In this way, we could design in such as way as to have
-a complexType defining an XML subtree for each object-relational aggregate
-we defined for PostgreSQL.
+aggregate as necessary.
 
 Following the principle of a complexType per entity, we could create
 a schema like that shown in figure~\ref{fig:xsd}.
@@ -641,23 +619,17 @@ a schema like that shown in figure~\ref{fig:xsd}.
   \label{fig:xsd}
 \end{figure}
 
-We have a simpleType which parallels the custom enum type used in the
-PostgreSQL database as well as a complexType per entity in the entity
-relational diagram shown in figure~\ref{fig:final_postgres}. There is one
-exception in that subcategories have not been modelled as a separate
-type. With XML we can use its hierachical, nested nature to compose
+With XML we can use its hierachical, nested nature to compose
 a tree of categories (in that each \lstinline|<category>| tag may
 itself have its own \lstinline|<categories>| tag). Query languages such
 as Xpath and Xquery should permit us to search for top-level categories
 only, subcategories only and even across all categories and subcategories
 together (since their respective XML subtrees share the same complexType and
-are thus isomorphic). These three possibilities are what we would want
-from an inheritance model, so this nested composition could be said
-to be equivalent to subcategories inheriting from a parent category type.
+are thus isomorphic).
 
 One important thing to note is that we have now denormalised the
 categories and replicated them across each programme. This has
-added a lot of redundancy, but is a simpler approach that makes better
+added redundancy, but is a simpler approach that makes better
 use of the hiearchical nature of XML, whereas references and foreign
 keys are not natively possible with XML documents. We will see how
 simple this keeps the queries when we come to pull information back
