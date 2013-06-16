@@ -351,17 +351,11 @@ DETAIL:  Key (category_id)=(9200041) is not present in table \
 "category".
 \end{verbatim}
 
-It seems that we are attempting to insert a link between a programme and
-a category that doesn't exist. The ID 9200041 refers to a subcategory called
-\emph{arts\_culture\_and\_the\_media}, underneath the \emph{factual} top-level
-category. The problem we have encountered here is a limitation with the
+The problem we have encountered here is a limitation with the
 inheritance model in PostgreSQL in that our foreign key from the
 programme\_category relation to the category relation can only refer to things
 that are strictly categories and not the subcategories. The child relation
 of subcategory cannot inherit being a suitable reference from another table.
-A similar limitation is seen again in that we have to define an explicit
-primary key in the subcategory table as that is something else which
-cannot inherit from a parent table.
 
 The PostgreSQL documentation \cite{postgres-docs} confirms this to be the
 case and moreover states ``There is no good workaround for this case.'' So,
@@ -397,10 +391,8 @@ situations.
 
 \subsection{Querying}
 
-With a schema design that now works and the CSV of programmes information
-converted and imported into that schema, we can look at how we get
-the information back out. Without formal requirements, we can only
-suppose some of the use cases, but we can assume some relatively typical
+Without formal requirements, we can only
+suppose some of the query use cases, but we can assume some relatively typical
 needs. We can express these as questions as asked by an end user and then
 look into the queries they would then translate into for the database.
 
@@ -409,26 +401,15 @@ or alter the information.
 
 \subsubsection{What can I watch right now?}
 
-This is a basic query where we seek everything where the start\_time is
-in the past, but the end\_time is in the future:
-
 \begin{lstlisting}[language=SQL]
   SELECT * FROM availability_window
     JOIN programme ON availability_window.pid = programme.pid
   WHERE start_time <= now() AND end_time >= now();
 \end{lstlisting}
 
-We should be able to trust the query optimisation to know to
-narrow the availability\_window down to the relatively small set
-of things available only now before doing the join to the larger
-programme table.
-
 \subsubsection{What categories are there?}
 
-An application like BBC iPlayer may wish to query for a list of all
-categories so as to create a navigation menu that allows users
-to drill down into a particular category to see what is
-available thereunder.
+We may want to query for all categories to build a navigation menu:
 
 \begin{lstlisting}[language=SQL]
   SELECT * FROM category
@@ -437,8 +418,7 @@ available thereunder.
 \end{lstlisting}
 
 Note that we have to match on null parents to select only
-top-level categories (we don't want to bombard a user with every
-possible subcategory until they choose to drill down futher). Had
+top-level categories. Had
 we been able to stick with our inheritance model that turned out
 not to be possible, we could have had a arguably more elegant
 query:
@@ -472,29 +452,6 @@ the children's category:
   WHERE parent = '9100001'
   ORDER BY title;
 \end{lstlisting}
-
-Again, we could have had a slightly clearer query with the inheritance
-model:
-
-\begin{lstlisting}[language=SQL]
-  SELECT * FROM subcategory
-  WHERE parent = '9100001'
-  ORDER BY title;
-\end{lstlisting}
-
-Where it is arguably clearer we are specifically looking for a subcategory.
-This is demonstrated further because we would be unable to do an accidental
-attempt to find a top-level category with a parent:
-
-\begin{lstlisting}[language=SQL]
-  SELECT * FROM category
-  WHERE parent = '9100001'
-  ORDER BY title;
-\end{lstlisting}
-
-With the inheritance model, the query above would fail as the category
-table has no parent field (only subcategories have parents), which
-could be seen to be more robust against programmer error.
 
 \subsubsection{What can I watch now within a single category?}
 
@@ -549,8 +506,8 @@ table:
   ('cbbc', 'chucklevision:_series_18:_barryella', 'b0079214', 'video', 'b006w487', '0');
 \end{lstlisting}
 
-Fortunately, there is little inconsistency from simply adding links
-to any existing categories in a subsequent update:
+We might want to include adding the programme to its category in the same
+transaction:
 
 \begin{lstlisting}[language=SQL]
   INSERT INTO programme_category
@@ -559,23 +516,16 @@ to any existing categories in a subsequent update:
   ('b0079214', '9100001');
 \end{lstlisting}
 
-It would not appear to be very harmful to have a programme in the database
-that does not yet have categories assigned (users would simply not be able to
-navigate to the programme easily until then) and there is no problem
-with referential integrity between those two updates. If, however,
-this situation is not acceptable even in a short time frame, we can bundle
-these updates within a single transaction. It should be discussed in the
-software requirements whether it is necessary to complicate the updates
-if there is little risk of consistency problems. It is reasonable that
-we would want our software to abandon the whole update if a content
-editor tries to add a programme to a non-existent category. Again,
-it is arguably more in line with the principle of least astonishment to
-fail to add any programme information if there is a mistake in the transaction.
+It could be argued that we do not need to use transactions as there is
+little harm in having a programme that -- for a fraction of a second --
+does not appear underneath its category in the navigation right away. If
+they turned out to be costly to use, we might accept our application
+not using them.
 
 \subsubsection{I want to add a new programme with new tags}
 
 It is trivial to include as many tags as we want in our original programme
-insertion:
+insertion since they are arbitrary strings:
 
 \begin{lstlisting}[language=SQL]
   INSERT INTO programme
@@ -583,14 +533,6 @@ insertion:
   VALUES
   ('{"comedy", "silly"}', 'cbbc', 'chucklevision:_series_18:_barryella', 'b0079214', 'video', 'b006w487', '0');
 \end{lstlisting}
-
-Due to the earlier decision to create the tags field as a denormalised, free-form
-array of character strings against each programme, tagging a new programme
-with new or existing tags is exactly the same operation. Our update is unaffected
-by whether the tag is already present in the database or not. It is another
-question for the software requirements gathering as to whether it is
-acceptable that content editors can simply create tags in this loose manner (especially
-if they are fully capable of creating tags with spelling mistakes).
 
 \subsubsection{I want to add a new programme with a new category}
 
@@ -601,11 +543,9 @@ except we must first do the update to insert the new category:
   INSERT INTO category (id, title) VALUES ('9100010', 'sport');
 \end{lstlisting}
 
-Again, there is a design decision to be made as to whether it is
-acceptable for the category to be inserted with the programme update
-then failing (and thus leaving the database with a category with no
-programmes therewithin) or whether it is preferable to do all
-three updates as a single transaction.
+We may want to consider transactions again unless it is acceptable
+to have a brief moment where the new category does not have the new
+programme in it yet.
 
 \subsubsection{I want to correct a spelling mistake in a title}
 
@@ -620,15 +560,10 @@ This is a simple, atomic update:
 \subsubsection{I want to revoke a programme}
 
 There may be a case where a planned broadcast of a programme is
-cancelled for technical or legal reasons. If we have been populating
-our on-demand/catch-up service database with the availability
-window suggesting that users will be able to watch that programme soon,
-we will want to be able to remove a programme's record and associated
-availability.
+cancelled for technical or legal reasons.
 
 In a more simpler case where we just want to remove the availability of
-the programme to watch, we just need to remove its availability window
-(if we lose the rights to let people watch the programme on-demand):
+the programme to watch, we just need to remove its availability window:
 
 \begin{lstlisting}[language=SQL]
   DELETE FROM availability_window
@@ -1164,7 +1099,8 @@ Microsoft AJAX Library uses a special string format for dates in JSON:
 ``/Date(1234567890)/''. \cite{ms-ajax-json-dates} Other libraries
 and clients may choose to write out the date as a string in ISO-8601 format,
 but it is hard to dismbiguate that from a string literal containing
-a date. It follows from the Principle of Least Astonishment again
+a date. It follows from the Principle of Least Astonishment
+\cite{saltzer2009principles} again
 that we might not want our software ``magically'' interpreting
 string literals that happen to contain something that looks like a date
 and time as a date/time object.
