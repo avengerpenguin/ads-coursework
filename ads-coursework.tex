@@ -99,7 +99,7 @@ is not going to handle the list of tags nor the complex category structures.
   }
   @enduml
 \end{comment}
-\begin{figure}[p]
+\begin{figure}[h]
   \begin{center}
     \includegraphics[width=1in]{plant_single_relation.png}
   \end{center}
@@ -146,10 +146,6 @@ Figure~\ref{fig:cat-tags-rel}.
   \label{fig:cat-tags-rel}
 \end{figure}
 
-We can do a lot more normalisation and achieve the model shown in
-figure~\ref{fig:3nf}. Note also that the redundancy of having both
-timestamps and date strings in ISO 8601 format is removed.
-
 \begin{comment}
   @startuml plant_3nf.png
   class Programme {
@@ -186,6 +182,45 @@ timestamps and date strings in ISO 8601 format is removed.
   \label{fig:3nf}
 \end{figure}
 
+\begin{comment}
+  @startuml plant_final_postgres.png
+  class Programme {
+    pid : varchar
+    complete_title : varchar
+    media_type : enum ['video, 'audio']
+    masterbrand : varchar
+    brand_pid : varchar
+    is_clip : boolean
+    tags : varchar[]
+  }
+  class AvailabilityWindow {
+    start_time : timestamp
+    end_time : timestamp
+    service : varchar
+  }
+  class Category {
+    id : varchar
+    title : varchar
+  }
+  class Subcategory extends Category {
+    parent : Category
+  }
+  Programme "1" -d- "0..*" AvailabilityWindow
+  Programme "0..*" -r- "0..*" Category
+  @enduml
+\end{comment}
+\begin{figure}[p]
+  \begin{center}
+    \includegraphics[width=\linewidth]{plant_final_postgres.png}
+  \end{center}
+  \caption{Candidate final design for PostgresSQL database}
+  \label{fig:final_postgres}
+\end{figure}
+
+We can do a lot more normalisation and achieve the model shown in
+figure~\ref{fig:3nf}. Note also that the redundancy of having both
+timestamps and date strings in ISO 8601 format is removed.
+
 When we come to implement the entities and their respective relations
 as shown in figure~\ref{fig:3nf}, we would create the following relations:
 
@@ -198,7 +233,7 @@ as shown in figure~\ref{fig:3nf}, we would create the following relations:
   \item ProgrammeTag(pid, title)
 \end{enumerate}
 
-So, what benefits can we can from the non-SQL or object-like features of
+So, what benefits can we get from the non-SQL or object-like features of
 PostgreSQL over and above the pure relational mode?
 
 \subsubsection{Aggregates and object-relational}
@@ -244,41 +279,6 @@ aggregate (for simplicity, performance and atomic updates) and using
 inheritence to maintain a category hierarchy, we arrive at a final
 candidate entity relationship design as shown in figure~\ref{fig:final_postgres}.
 
-\begin{comment}
-  @startuml plant_final_postgres.png
-  class Programme {
-    pid : varchar
-    complete_title : varchar
-    media_type : enum ['video, 'audio']
-    masterbrand : varchar
-    brand_pid : varchar
-    is_clip : boolean
-    tags : varchar[]
-  }
-  class AvailabilityWindow {
-    start_time : timestamp
-    end_time : timestamp
-    service : varchar
-  }
-  class Category {
-    id : varchar
-    title : varchar
-  }
-  class Subcategory extends Category {
-    parent : Category
-  }
-  Programme "1" -d- "0..*" AvailabilityWindow
-  Programme "0..*" -r- "0..*" Category
-  @enduml
-\end{comment}
-\begin{figure}[p]
-  \begin{center}
-    \includegraphics[width=\linewidth]{plant_final_postgres.png}
-  \end{center}
-  \caption{Candidate final design for PostgresSQL database}
-  \label{fig:final_postgres}
-\end{figure}
-
 \subsection{Implementation}
 
 With a design finalised, we can build a PostgreSQL database from
@@ -289,6 +289,12 @@ dialect of SQL is shown in figure~\ref{fig:create_table}.
   \lstinputlisting[frame=single,language=SQL]{postgres_broken.sql}
   \caption{SQL script to create PostgreSQL tables for programme data}
   \label{fig:create_table}
+\end{figure}
+
+\begin{figure}[p]
+  \lstinputlisting[frame=single,language=SQL,firstline=10,lastline=46]{postgres.sql}
+  \caption{PostgreSQL script without using inheritance}
+  \label{fig:flatten-category}
 \end{figure}
 
 However, there is a problem with this schema. When we try to import the
@@ -322,12 +328,6 @@ in that our relation that refers to a category cannot have its foreign key
 constrained field make a reference to the subcategory relation. In other
 words, we are unable to use a subcategory logically everywhere we could
 have used a category.
-
-\begin{figure}[p]
-  \lstinputlisting[frame=single,language=SQL,firstline=10,lastline=46]{postgres.sql}
-  \caption{PostgreSQL script without using inheritance}
-  \label{fig:flatten-category}
-\end{figure}
 
 There are a number of ways we could restructure our schema design to
 avoid this limitation and a simple one is to eschew the inheritance feature
@@ -378,11 +378,10 @@ query:
   ORDER BY title;
 \end{lstlisting}
 
-Where the \emph{ONLY} keyword ensures we only return things that
-are strictly categories and not from the subcategory child table.
+Where the \emph{ONLY} keyword ensures we only return top-level
+categories.
 This is arguably clearer as could be seen to follow the
-\emph{Principle of Least Astonishment}
-\cite{saltzer2009principles}
+\emph{Principle of Least Astonishment} \cite{saltzer2009principles}
 in that a programmer
 is not having to be aware of explicitly adding ``parent IS NULL''
 to a simple query for main categories only. It fits better with
@@ -569,10 +568,20 @@ a schema like that shown in figure~\ref{fig:xsd}.
   \label{fig:xsd}
 \end{figure}
 
+\begin{figure}[p]
+  \lstinputlisting[
+  frame=single,language=XML,basicstyle=\scriptsize,breakatwhitespace=false
+  ]{
+    xml/b00sn5cy.xml
+  }
+  \caption{Example XML representation of a programme}
+  \label{fig:xml-example}
+\end{figure}
+
 With XML we can use its hierachical, nested nature to compose
 a tree of categories (in that each \lstinline|<category>| tag may
 itself have its own \lstinline|<categories>| tag). Query languages such
-as Xpath and Xquery should permit us to search for top-level categories
+as XPath and XQuery should permit us to search for top-level categories
 only, subcategories only and even across all categories and subcategories
 together (since their respective XML subtrees share the same complexType and
 are thus isomorphic).
@@ -595,19 +604,9 @@ into eXist with a single command:
 $ $EXIST_HOME/bin/client.sh -m /db/programmes -p *.xml
 \end{lstlisting}
 
-\begin{figure}[p]
-  \lstinputlisting[
-  frame=single,language=XML,basicstyle=\scriptsize,breakatwhitespace=false
-  ]{
-    xml/b00sn5cy.xml
-  }
-  \caption{Example XML representation of a programme}
-  \label{fig:xml-example}
-\end{figure}
-
 \subsection{Querying}
 
-In this section, we see how to query the XML collection using Xquery to
+In this section, we see how to query the XML collection using XQuery to
 achieve the same queries as performed in PostgreSQL.
 
 \subsubsection{What can I watch right now?}
@@ -622,6 +621,13 @@ where $programme/availability/window/start_time < current-dateTime()
   and $programme/availability/window/end_time > current-dateTime()
 return $programme
 \end{lstlisting}
+
+This takes advantage of the fact there is only one availability window
+per programme and may not work if there one each of a window in
+the past and in the future as it will look like we are between the past
+start time and the future end time.
+
+\pagebreak
 
 \subsubsection{What categories are there?}
 
@@ -656,7 +662,7 @@ This is similar to the previous query:
 \begin{lstlisting}
 xquery version "3.0";
 
-let $all_subcategories := //programme/categories/category[id="9100098"]/categories/category
+let $all_subcategories := //programme/categories/category[id="9100098"]/ categories/category
 for $subcategory_id in distinct-values($all_subcategories/id)
 let $subcategories := $all_subcategories[id=$subcategory_id]
 let $subcategory_title := $subcategories[1]/title/text()
@@ -692,13 +698,15 @@ programmes broadcast originally on BBC One:
 \begin{lstlisting}
 xquery version "3.0";
 for $programme in /programme
-where $programme/availability/window[service='bbc_one']/start_time < current-dateTime()
-  and $programme/availability/window[service='bbc_one']/end_time > current-dateTime()
+where $programme/availability/window[service='bbc_one']/ start_time < current-dateTime()
+  and $programme/availability/window[service='bbc_one']/ end_time > current-dateTime()
 return $programme
 \end{lstlisting}
 
 This turns out to be a very inefficient query without indexes. We should ensure
 that our eXist DB collection is indexing on the service field.
+
+\pagebreak
 
 \subsubsection{What can I watch that has a given tag?}
 
@@ -742,6 +750,8 @@ in any document adding in the previous manner.
 Similarly to tags, categories are denormalised through all documents, so
 we can use any of the available ways to add new documents to include
 any categories -- new or existing -- in those documents.
+
+\pagebreak
 
 \subsubsection{I want to correct a spelling mistake in a title}
 
@@ -918,26 +928,6 @@ in figure~\ref{fig:mongo-availability-window}.
   \label{fig:mongo-availability-window}
 \end{figure}
 
-Modelling this as a separate collection is not only more
-normalised (even though MongoDB will not enforce foreign key
-constraints), but allows us to use some interesting features
-of MongoDB and apply them only to the availability collection.
-
-One feature that MongoDB provides is that of a TTL on documents
-within a certain collection. \cite{mongo-expiry} With this
-feature, we could well tell MongoDB to delete all availability
-windows straight after the end time is reached.
-Then we simply have to query the collection
-for everything therein without filtering.
-
-However, we cannot do join operations between collections. Instead,
-the ``correct'' way to do this in line with MongoDB's ethos
-is to denormalise further and start to embed some of a
-programme's information within the availability window
-object as show in figure~\ref{fig:mongo-availability-denormal}.
-Note that the tags are also included as we may have a use
-case for searching by tag.
-
 \begin{figure}[p]
 \begin{lstlisting}[language=json]
   {
@@ -954,6 +944,26 @@ case for searching by tag.
   \caption{Availability window modelled with further denormalisation}
   \label{fig:mongo-availability-denormal}
 \end{figure}
+
+Modelling this as a separate collection is not only more
+normalised (even though MongoDB will not enforce foreign key
+constraints), but allows us to use some interesting features
+of MongoDB and apply them only to the availability collection.
+
+One feature that MongoDB provides is that of a TTL on documents
+within a certain collection. \cite{mongo-expiry} With this
+feature, we could well tell MongoDB to delete all availability
+windows straight after the end time is reached.
+Then we simply have to query the collection
+for everything therein without filtering.
+
+However, we cannot do join operations between collections. Instead,
+the ``correct'' way to do this in line with MongoDB's ethos
+is to denormalise further and start to embed some of a
+programme's information within the availability window
+object as shown in figure~\ref{fig:mongo-availability-denormal}.
+Note that the tags are also included as we may have a use
+case for searching by tag.
 
 \subsection{Implementation}
 \label{sec:mongo-implementation}
@@ -1025,7 +1035,8 @@ on availability windows as well, we can easily query for all
 availability windows within any programme category:
 
 \begin{lstlisting}[language=json]
-  db.availability.find({"programme.categories.9100001": {"$exists": "true"}});
+  db.availability.find(
+    {"programme.categories.9100001": {"$exists": "true"}});
 \end{lstlisting}
 
 \subsubsection{What's become available to watch for a particular TV/Radio channel?}
@@ -1057,15 +1068,12 @@ always doing two queries together:
 \begin{lstlisting}[language=json]
   db.programmes.insert(
   {
-    pid: "abc123",
-    complete_title: "Programme Title Here",
-    media_type: "video",
+    "pid": "abc123",
+    "complete_title": "Programme Title Here",
+    "media_type": "video",
     "masterbrand": "bbc_one",
     "is_clip": 0,
-    "categories": [
-      {id: "9100005", name: "factual"),
-      {id: "9200041", name: "arts_culture_and_the_media")
-    ],
+    "categories": {"9100005": "factual", "9200041": "arts_culture_and_the_media"},
     "tags": ["history", "romans"]
   },
   );
@@ -1084,45 +1092,34 @@ always doing two queries together:
 \end{lstlisting}
 
 This, of course, can be ensured in application code with a helper function
-such as $addProgramme(programme_details, availability_details)$.
+such as $addProgramme(programme\_details, availability\_details)$.
 
 \subsubsection{I want to add a new programme with new tags}
 
 Given that tags are modelled as string literals, this is no different to adding
 a programme as above, but using string literals that aren't already in use.
 
-\subsubsection{I want to add a new programme with a new category}
+\pagebreak
 
-This is another case where we need multiple inserts and risk inconsistency.
-Given that transactions do not fit into the way of doing things in MongoDB,
-we should instead look at the application needs to ascertain the impact
-of inconsistency. It is likely that it is less harmful for a programme to be
-added under a category that is not yet navigable than it is for a category
-to appear in the navigation that links to a programme that does not exist yet
-(e.g. an HTTP 404 would be encountered in a web application). To this
-end, we can add our programme before adding the new category:
+\subsubsection{I want to add a new programme with a new category}
 
 \begin{lstlisting}[language=json]
   db.programmes.insert(
   {
-    pid: "abc123",
-    complete_title: "Programme Title Here",
-    media_type: "video",
+    "pid": "abc123",
+    "complete_title": "Programme Title Here",
+    "media_type": "video",
     "masterbrand": "bbc_one",
     "is_clip": 0,
-    "categories": [
-      {id: "9100005", name: "factual"),
-      {id: "9200041", name: "arts_culture_and_the_media")
-    ],
+    "categories": {"9100005": "factual", "9200041": "arts_culture_and_the_media"},
     "tags": ["history", "romans"]
-  },
-  );
+  });
   db.categories.insert(
     {
-      "id": "9200041",
-      "name": "arts_culture_and_the_media",
-      "parent": "9100005",
-      "ancestors": [
+      id: "9200041",
+      name: "arts_culture_and_the_media",
+      parent: "9100005",
+      ancestors: [
         {
           "id": "9100005",
           "name": "factual"
@@ -1131,8 +1128,7 @@ end, we can add our programme before adding the new category:
       "programmes": [
         "abc123"
       ]
-    }
-  );
+    });
   db.availability.insert(
   {
     "start_time": new Date("2012-08-20T05:32:00"),
@@ -1143,9 +1139,17 @@ end, we can add our programme before adding the new category:
       "categories": {"9100005": "factual", "9200041": "arts_culture_and_the_media"},
       "tags": ["history", "romans"]
     }
-  }
-  );
+  });
 \end{lstlisting}
+
+This is another case where we need multiple inserts and risk inconsistency.
+Given that transactions do not fit into the way of doing things in MongoDB,
+we should instead look at the application needs to ascertain the impact
+of inconsistency. It is likely that it is less harmful for a programme to be
+added under a category that is not yet navigable than it is for a category
+to appear in the navigation that links to a programme that does not exist yet
+(e.g. an HTTP 404 would be encountered in a web application). To this
+end, we can add our programme before adding the new category:
 
 If we truly want this to be transactional, the MongoDB
 documentation suggests \cite{mongo-two-phase-commits} that it

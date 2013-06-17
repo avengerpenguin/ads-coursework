@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <xs:schema elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  
   <xs:element name="programme" type="programme"/>
-  
   <xs:simpleType name="media">
     <xs:restriction base="xs:string">
       <xs:enumeration value="video"/>
       <xs:enumeration value="audio"/>
     </xs:restriction>
   </xs:simpleType>
-  
   <xs:complexType name="programme">
     <xs:sequence>
       <xs:element type="xs:string" name="pid"/>
@@ -35,7 +32,6 @@
       </xs:element>
     </xs:sequence>
   </xs:complexType>
-
   <xs:complexType name="availabilityWindow">
     <xs:sequence>
       <xs:element type="xs:dateTime" name="start_time"/>
@@ -43,13 +39,11 @@
       <xs:element type="xs:string" name="service"/>
     </xs:sequence>
   </xs:complexType>
-  
   <xs:complexType name="categories">
     <xs:sequence>
       <xs:element name="category" type="category" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
   </xs:complexType>
-        
   <xs:complexType name="category">
     <xs:sequence>
       <xs:element type="xs:string" name="id"/>
@@ -57,5 +51,4 @@
       <xs:element name="categories" type="categories" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
   </xs:complexType>
-  
 </xs:schema>
