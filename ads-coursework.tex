@@ -213,7 +213,7 @@ Figure~\ref{fig:cat-tags-rel}.
   \begin{center}
     \includegraphics[width=\linewidth]{plant_final_postgres.png}
   \end{center}
-  \caption{Candidate final design for PostgresSQL database}
+  \caption{Candidate final design for PostgreSQL database}
   \label{fig:final_postgres}
 \end{figure}
 
@@ -269,14 +269,14 @@ category entity. The level attribute of a category (so far only values
 \emph{1} and \emph{2} are observed) hints at a category hierarchy with
 level 1 categories being root categories and level 2 categories being
 children thereof. It is possible to model this using table
-\emph{inheritence} within PostgreSQL. In this case, we could define
+\emph{inheritance} within PostgreSQL. In this case, we could define
 a Subcategory table that inherits the identifier and title attributes
 from the Category table, but additionally adds a reference to any
 other (sub)category indicating its parent.
 
 Taking the approach of making tags string arrays within the programme
 aggregate (for simplicity, performance and atomic updates) and using
-inheritence to maintain a category hierarchy, we arrive at a final
+inheritance to maintain a category hierarchy, we arrive at a final
 candidate entity relationship design as shown in figure~\ref{fig:final_postgres}.
 
 \subsection{Implementation}
@@ -323,7 +323,7 @@ a basic level -- that if some type $S$ is a subtype of a type $T$, then
 any object or instance of $T$ may be swapped out for an object of
 type $S$ without altering the behaviour of a programme or system.
 
-PostgreSQL's inheritance model violates the Liskov Substituion Principle
+PostgreSQL's inheritance model violates the Liskov Substitution Principle
 in that our relation that refers to a category cannot have its foreign key
 constrained field make a reference to the subcategory relation. In other
 words, we are unable to use a subcategory logically everywhere we could
@@ -539,7 +539,7 @@ availability\_window table as well.
 In this section, we will explore importing the same programmes dataset
 into an XML database. We will use \emph{eXist} as an example of such
 a database system and step through the same design-implement-query
-approach as used for PostgresSQL in section~\ref{sec:postgres}.
+approach as used for PostgreSQL in section~\ref{sec:postgres}.
 
 \subsection{Design}
 
@@ -578,7 +578,7 @@ a schema like that shown in figure~\ref{fig:xsd}.
   \label{fig:xml-example}
 \end{figure}
 
-With XML we can use its hierachical, nested nature to compose
+With XML we can use its hierarchical, nested nature to compose
 a tree of categories (in that each \lstinline|<category>| tag may
 itself have its own \lstinline|<categories>| tag). Query languages such
 as XPath and XQuery should permit us to search for top-level categories
@@ -589,7 +589,7 @@ are thus isomorphic).
 One important thing to note is that we have now denormalised the
 categories and replicated them across each programme. This has
 added redundancy, but is a simpler approach that makes better
-use of the hiearchical nature of XML, whereas references and foreign
+use of the hierarchical nature of XML, whereas references and foreign
 keys are not natively possible with XML documents. We will see how
 simple this keeps the queries when we come to pull information back
 out of the database.
