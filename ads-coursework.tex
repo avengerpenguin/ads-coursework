@@ -53,48 +53,12 @@ three different kinds of databases beyond the traditional relational model. In i
 the same dataset will be modelled in each of an \emph{Object-Relational} database,
 an \emph{XML} database and a \emph{Document} database.
 
-A suggested structure or schema will be designed for each database type, then
-each design will be implemented in each of \emph{PostgreSQL}, \emph{eXist}
-and \emph{MongoDB} along with a discussion around how each database would be
-queried for different use cases.
-
-Finally, there will be a comparitive discussion around the advantages and
-disadvantages between the different database types, including which the use
-cases to which each kind of database are most appropriate.
-
 \section{The Data}
 
 The dataset that will be used is a small set of 7,788 TV and radio programmes
 that have been available to listen to or watch on some form of catch-up
 service (e.g. the old radio ``Listen Again'' service or BBC iPlayer) between
 2001 and 2012.
-
-The raw data begin in a comma-separated format, with each row representing
-a single programme. Each programme row comprises:
-
-\begin{itemize}
-    \item an identifier known as a \emph{pid} (programme ID);
-    \item a start and end time (in both Unix timestamp and ISO 8601 formats);
-    \item a title;
-    \item a media type (i.e. audio or video);
-    \item the master brand with which the programme is associated (somewhat
-      correlated with the channel that broadcasted the programme, e.g.
-      BBC Radio Four or BBC Two);
-    \item the service that did broadcast the programme originally;
-    \item a pid identifier for the programme's brand (e.g. for an episode of
-      Doctor Who this would be the identifier for the Doctor Who concept
-      in general);
-    \item whether or not this is a programme or a just a clip that was
-      available to watch/listen to;
-    \item any categories associated with the programme; and
-    \item any tags set against the programme.
-\end{itemize}
-
-We might imagine that this will form the basis of a whole archive of BBC
-TV and radio programmes with a variety of use cases for such an archive.
-Potential uses for such a database will be discussed as different designs
-and approaches are used to import this information into three different
-database systems.
 
 \section{Object-Relational}
 \label{sec:postgres}
@@ -103,9 +67,8 @@ The Object-Relational database system used here is PostgreSQL, which supports
 pure relational databases and SQL, but also has support for objects and
 inheritance to support an aggregate-oriented approach, where we can store
 aggregates of data together as single objects for atomic updates against
-them or simply to group information together into logical objects. This
-takes us somewhat away from the pure relational model where data aggregation
-is distributed across relations between many tuples. \cite{sadalage2012nosql}
+them or simply to group information together into logical objects.
+\cite{sadalage2012nosql}
 
 \subsection{Design}
 
@@ -245,25 +208,12 @@ have to do a JOIN query each time. With very large Programme and Tag tables, thi
 JOIN could get very expensive -- especially with complex filtering involved.
 
 In a more aggregate-oriented approach, we could treat the tags as an
-intrinsic part of a programme \emph{aggregate} -- we would only want to update
-the tags within the context of updating a programme and we're hardly
-ever likely to query a Tag relation independently of the Programme relation.
-With this, we could employ an array type within PostgreSQL  containing string
-values.
-
-Note that updating the aggregate atomically in this way removes the need
-to use transactions, which would be necessary if we were both updating the
-Tag and Programme relations in a single update. Again, we could see some
-real performance gains if this database were receiving a lot of updates and
-would otherwise be subject to a lot of locking and contention. \cite{sadalage2012nosql}
-
-It comes down to how business applications intend to use the tags.,
-The concept of tagging is normally a loose way to add textual metadata to a
-business object to aid searches, automatic aggregation and even data
-mining potential (e.g. this user likes things with this particular tag,
-so we can suggest them more content with similar tags).
+intrinsic part of a programme \emph{aggregate}. This removes the need
+for transactions as we can do an atomic update of a programme
+and its tags together.
 
 Tagging is something that can even somewhat benefit from being unconstrained
+(i.e. denormalised across programmes)
 and freely chosen as the item is added or updated. \cite{smith2008tagging}
 
 \subsubsection{Modelling programme categories}
@@ -836,11 +786,6 @@ cases.
 
 \subsection{Design}
 
-MongoDB is a NoSQL database that very much fits in with the idea of
-an aggregate-oriented system whereby we think about creating objects
-or aggregates that represent the items on which we will be wanting
-to do atomic updates and other operations.
-
 Following the design used for the XML documents, we can start with
 JSON (although strictly MongoDB is a BSON data store, we can theoretically
 treat JSON as equivalent for the purposes of design)
@@ -879,13 +824,6 @@ documents that follow the same principles as shown in figure~\ref{fig:big-json-d
   \label{fig:big-json-doc}
 \end{figure}
 
-As usual, the JSON port of the XML document designed earlier is somewhat
-terser and the information to markup ratio is favourable, but have we
-lost some of the hierachical structure that the XML offered? With
-XML databases, we can use XPath expressions to search for arbitrary
-descendants of a node, but that does not fit in with how best
-to model things in JSON/BSON and MongoDB.
-
 \subsubsection{Modelling categories}
 \label{sec:mongo-design-categories}
 
@@ -919,7 +857,6 @@ MongoDB's built-in \emph{\_id} field could equally be used.
   \label{fig:json-categories}
 \end{figure}
 
-This approach to modelling categories appears to have several benefits.
 Adding a new category, restucturing the hierarchy or correcting an
 existing category document all become reasonably simple operations, which
 we will hopefully see when we look at querying the database in
@@ -930,48 +867,23 @@ names. In the example shown in figure~\ref{fig:json-categories}, the
 word ``drama'' appears not only in the \emph{drama} category document, but
 also in the ancestor object within the \emph{crime} category document.
 Should we want to rename that category, we have to ensure we update it
-in all places. This can be done in only two update operations (one
-for the category and one to update all ancestors at once), but
-that still leaves open the risk of inconsistency if one succeeds, but
-the other fails. Optionally, we could store only the IDs in the
+in all places.
+
+ Optionally, we could store only the IDs in the
 ancestors property, but we would lose the convenience of a single
 query being able to fetch a category and generate a ``bread crumb''
-trail in one operation. In this case, we should return again
-to specific software requirements as to whether we would want
-our application being able to fetch a programme with its full category
-bread crumb trail or whether we are happy for category hierarchies to
-be reconstructed from IDs and follow-up queries.
+trail in one operation.
 
 It is this kind of denormalisation that is usually a strength of MongoDB.
 The NoSQL approach of moving away from pure relations and normal forms
 means that we can happily duplicate category names to support
 both a single, atomic query for all categories but also a query
-for a category and its bread crumb trail. This allows for client
+for a category and its bread crumb trail.
+
+This allows for client
 applications to make very performant queries that retrieve everything
 in single fetches, without having to think about join operations
-or building ``views'' as would be the case in some SQL databases. This
-feeds again into the aggregate-oriented approach where we think about
-the aggregate objects that have business value and make sense for our
-software to use instead of the mathematical purity of normalised,
-relational tables. It could be argued as a pragmatic approach for
-the right cases, but it clearly comes at a cost of consistency now
-being a concern of the sofware, not the data store.
-
-\subsubsection{Linking programmes and categories}
-
-Following the suggested use case of a category hierarchy described
-in section~\ref{sec:mongo-design-categories}, we have a design for
-category objects in our database. How do we model a programme
-being within a given category?
-
-One approach is to have a categories collection alongside the
-programmes collection. The categories field can then be a list
-of ID references to appropriate categories within the categories
-collection. This is closer to the relational model of having
-separate tables for different entities, but with MongoDB such
-references are not enforced as constraints in any way. It is
-entirely possible to have dangling references to categories
-that were removed.
+or building ``views''.
 
 If we accept that application code can take on the responsibility
 of ensuring consistency, we can go further and create a
@@ -980,14 +892,11 @@ of references to programmes within that category. Such a bidirectional
 set of references \emph{must} by enforced by the client (or bespoke
 middleware possibly using something like \emph{mongoengine}). We
 should see in section~\ref{sec:mongo-querying} that this allows for
-very powerful, single queries as long as the consistency trade-off
-is acceptable.
+very powerful, single queries.
 
 \subsubsection{Availability}
 
-Leaving categories aside, we know that it is likely a client
-application will be wanting to query the programme model based
-on whether it is available to watch at the current time. Given
+Given
 that we are modelling the availability windows as a list/array
 type within the programme object, this would mean looking inside
 every array within every programme to find programmes where
@@ -1017,20 +926,11 @@ of MongoDB and apply them only to the availability collection.
 One feature that MongoDB provides is that of a TTL on documents
 within a certain collection. \cite{mongo-expiry} With this
 feature, we could well tell MongoDB to delete all availability
-windows straight after the end time is reached. This has implications
-of making sure the database is running on a server with accurate
-time (assuming time zones do not add further problems), but the
-benefit is that our queries for available programes do not even
-have to include time comparisons. If we are assured that the
-availability collection contains only windows for programmes
-that are avaiable right now, we simply have to query the collection
-for everything therin.
+windows straight after the end time is reached.
+Then we simply have to query the collection
+for everything therein without filtering.
 
-A foreseeable problem with having a separate availability
-collection is that in the relational approach, we wanted to join
-availability to programmes and again to categories so as to find
-available programmes in a particular category -- something we
-cannot do in MongoDB (it is not designed to do so). Instead,
+However, we cannot do join operations between collections. Instead,
 the ``correct'' way to do this in line with MongoDB's ethos
 is to denormalise further and start to embed some of a
 programme's information within the availability window
@@ -1055,28 +955,6 @@ case for searching by tag.
   \label{fig:mongo-availability-denormal}
 \end{figure}
 
-\subsubsection{Dates and times}
-
-Note the use of Javascript date objects for start/end datetimes in our
-programme document in figure~\ref{fig:big-json-doc}. This is
-shown for illustration only as JSON lacks a definitive standard for date
-and time objects. The BSON format used by MongoDB internally does
-in fact support datetime fields, but this can be represented in a
-number of ways if JSON is used as the transport format. The Javascript
-date object notation is accepted by MongoDB in the shell, which
-will be assumed to be the query client for our implementation and
-querying, but other clients of MongoDB may choose very different
-ways of representing dates and times. For example, the
-Microsoft AJAX Library uses a special string format for dates in JSON:
-``/Date(1234567890)/''. \cite{ms-ajax-json-dates} Other libraries
-and clients may choose to write out the date as a string in ISO-8601 format,
-but it is hard to dismbiguate that from a string literal containing
-a date. It follows from the Principle of Least Astonishment
-\cite{saltzer2009principles} again
-that we might not want our software ``magically'' interpreting
-string literals that happen to contain something that looks like a date
-and time as a date/time object.
-
 \subsection{Implementation}
 \label{sec:mongo-implementation}
 
@@ -1091,21 +969,14 @@ it starts doing the correct update and select queries.
 \subsection{Querying}
 \label{sec:mongo-querying}
 
-As stated in section~\ref{sec:mongo-implementation}, a MongoDB database
-design manifests in the queries more than in any setup. We do not need
-to design a schema ahead of time, but simply write our application such
-that its select queries pull out information in the same format that
-as the documents added via its insertion queries.
+Whilst MongoDB does not have schemas, we do effectively define
+a schema through the code that performs the queries, assuming
+all parts of the application query in the same way.
 
 There are libraries and middleware such as \emph{mongoengine} (for
 Python) and \emph{MongoMapper} (for Ruby) that allow a compromise
 whereby a schema can be defined in a class structure, which is
-then used by the application code. This is a good separation of concerns
-with which the rest of the application is unable to insert or fetch
-documents that do not meet expectations. However, the underlying
-schemaless nature of MongoDB itself means it is easy to update
-the schema that is defined in these model libraries and perhaps
-certain operations can add additional fields to need later on. Effectively,
+then used by the application code.  Effectively,
 this allows applications to work to a rigid schema, but without the
 database being the enforcer thereof.
 
@@ -1113,10 +984,6 @@ For the queries to follow, we will assume raw queries with the MongoDB
 shell without the benefits of any such middleware.
 
 \subsubsection{What can I watch right now?}
-
-With availability mapped in its own collection, we just need to query
-for windows in that collection whose times fall either side of the
-current time:
 
 \begin{lstlisting}[language=json]
   var currentTime = new Date();
@@ -1126,9 +993,8 @@ current time:
   });
 \end{lstlisting}
 
-Of course, if we implement the TTL feature such that availability
-window documents are removed automatically by MongoDB when the end time
-is reached, we simply have to do:
+With a TTL on the availability collection automatically removing things
+as the end time passes, we can just do:
 
 \begin{lstlisting}[language=json]
   db.availability.find();
