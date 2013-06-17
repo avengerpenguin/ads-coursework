@@ -1192,34 +1192,27 @@ We have to ensure we purge the programme from all collections:
 
 \section{Comparison}
 
-A few of the advantages and drawbacks of each database system
-and the respective design for our dataset have been discussed along
-the way. In this section, we will summarise some of the comparison
+In this section, we will summarise some of the comparison
 points and discuss which of the three systems is strongest in each
-area. As always, we would normally endeavour to collect more
-substantial user requirements for the software applications
-that intend to use the data store, so in many areas there
-is likely no ``clear cut'' winner whilst we are speculating many
-of these requirements.
+area. There is likely no objective ``clear cut'' winner whilst
+we are speculating many of the software requirements, which
+should be gathered to help inform a more firm choice.
 
 \subsection{Ease of design and implementation}
 
 \begin{itemize}
   \item RDBMS and SQL have familiarity amongst programmers.
-  \item RDBMS suffer from object-relational impedance mismatch
+  \item RDBMS suffer from object-relational impedance mismatch.
   \item MongoDB documents are more similar to the object data
     structures used by programmers.
-  \item MongoDB is capable of modelling even complex things
-    when you embrace the denormalisation required, but it can
-    feel like you are recreating features (e.g. foreign keys,
-    tree structures) within the documents that come for free as
-    part of other systems.
+  \item MongoDB is capable of modelling things like
+    transactions and foreign keys, but it can
+    feel like you are recreating features that come for free in RDBMS.
   \item The XML representation ``feels'' more natural for arranging
     as a hierarchy and searching descendants.
   \item Fetching XML from a database might appeal if the application
     is an XML-based API (XSLT and XSD can be used to transform
-    and validate with need for a large amount of bespoke, imperative
-    code).
+    and validate).
 \end{itemize}
 
 This is perhaps the most pragmatic comparison for choosing which
@@ -1234,18 +1227,18 @@ be the best option so as to avoid tricky schema migrations as
 the use cases are more fleshed out in time.
 
 PostgreSQL and eXist are stronger contenders if there is greater
-familiarity with SQL or XML or if other advantages thereof outweigh
-the loose, flexible benefits of MongoDB.
+familiarity with SQL or XML or if other advantages outweigh
+MongoDB's flexibility.
 
 \subsection{Performance}
 
 \begin{itemize}
-  \item MongoDB was developed primarily for rapid scaling, perhaps by
+  \item MongoDB was developed for easy scaling, perhaps by
     trading off consistency.
   \item Almost any database can be performant if designed in the right
     way with the right indexes.
-  \item MongoDB allows us to denormalise into different collections, e.g.
-    to fetch a list of categories or a list of programmes.
+  \item MongoDB encourages us to denormalise into different collections
+    for fast querying.
   \item PostgreSQL allows us to fetch from either categories or programmes
     without trading off normalisation.
   \item With eXist, we have to decide whether a programme or a category
